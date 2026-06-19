@@ -85,9 +85,7 @@ function mapTaxExpense(
   }
 
   const amount =
-    entry.taxExpenseAmount > 0
-      ? entry.taxExpenseAmount
-      : calculateBuildingTaxExpenseAmount(entry.chargeAmount, entry.paidAt);
+    calculateBuildingTaxExpenseAmount(entry.chargeAmount, entry.paidAt);
 
   if (amount <= 0) {
     return null;
@@ -163,25 +161,25 @@ export function buildExpenseMetrics(records: ExpenseBoardRecord[]): DashboardMet
   return [
     {
       label: "Gastos del mes",
-      value: formatGs(totalAmount),
+      value: formatGs(totalAmount, { maximumFractionDigits: 2 }),
       hint: `${records.length} gastos entre manuales e IVA`,
       tone: "clay",
     },
     {
       label: "Pagados",
-      value: formatGs(totalPaid),
+      value: formatGs(totalPaid, { maximumFractionDigits: 2 }),
       hint: `${records.filter((item) => item.status === "pagado").length} gastos ya cubiertos`,
       tone: "mint",
     },
     {
       label: "Pendientes",
-      value: formatGs(totalPending),
+      value: formatGs(totalPending, { maximumFractionDigits: 2 }),
       hint: `${records.filter((item) => item.status === "pendiente").length} gastos por pagar`,
       tone: "sun",
     },
     {
       label: "IVA generado",
-      value: formatGs(totalTax),
+      value: formatGs(totalTax, { maximumFractionDigits: 2 }),
       hint: `${records.filter((item) => item.source === "iva").length} gastos automaticos por cobros`,
       tone: "ink",
     },

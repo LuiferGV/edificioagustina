@@ -1058,7 +1058,7 @@ export default function App() {
       });
       setPageMessage(
         paymentForm.paidAt
-          ? `Pago de ${paymentEditorSpace.displayName} registrado para ${formatPeriodLabel(paymentForm.period)}. IVA generado: ${formatGs(nextRecord.taxExpenseAmount)}.`
+          ? `Pago de ${paymentEditorSpace.displayName} registrado para ${formatPeriodLabel(paymentForm.period)}. IVA generado: ${formatGs(nextRecord.taxExpenseAmount, { maximumFractionDigits: 2 })}.`
           : `Cobranza de ${paymentEditorSpace.displayName} preparada para ${formatPeriodLabel(paymentForm.period)}.`,
       );
       setPageMessageTone("success");
@@ -1267,7 +1267,11 @@ export default function App() {
             </div>
             <div>
               <span>IVA edificio</span>
-              <strong>{record.taxExpenseAmount > 0 ? formatGs(record.taxExpenseAmount) : "Se genera al pagar"}</strong>
+              <strong>
+                {record.taxExpenseAmount > 0
+                  ? formatGs(record.taxExpenseAmount, { maximumFractionDigits: 2 })
+                  : "Se genera al pagar"}
+              </strong>
             </div>
             <StatusPill value={record.statusLabel} />
           </div>
@@ -1326,7 +1330,11 @@ export default function App() {
                 </div>
                 <div className="mini-charge-item__meta">
                   <StatusPill value={record.statusLabel} />
-                  <span>{formatGs(record.amount)}</span>
+                  <span>
+                    {formatGs(record.amount, {
+                      maximumFractionDigits: record.source === "iva" ? 2 : 0,
+                    })}
+                  </span>
                 </div>
               </article>
             ))}
@@ -1353,7 +1361,11 @@ export default function App() {
           <div className="ledger-row__meta">
             <div>
               <span>Monto</span>
-              <strong>{formatGs(record.amount)}</strong>
+              <strong>
+                {formatGs(record.amount, {
+                  maximumFractionDigits: record.source === "iva" ? 2 : 0,
+                })}
+              </strong>
             </div>
             <div>
               <span>Vencimiento</span>
@@ -2534,10 +2546,10 @@ export default function App() {
                   <span>IVA del edificio</span>
                   <strong>
                     {paymentTaxExpensePreview > 0
-                      ? formatGs(paymentTaxExpensePreview)
+                      ? formatGs(paymentTaxExpensePreview, { maximumFractionDigits: 2 })
                       : "Se genera al marcar el alquiler como pagado"}
                   </strong>
-                  <p>Se calcula automaticamente como el 5% del valor del alquiler del mes.</p>
+                  <p>Se calcula automaticamente como el IVA del 5% incluido dentro del monto del alquiler.</p>
                 </article>
 
                 <label className="search-field auth-form__field">

@@ -68,7 +68,11 @@ export function calculateBuildingTaxExpenseAmount(chargeAmount: number, paidAt: 
     return 0;
   }
 
-  return Math.round(Math.max(0, chargeAmount) * 0.05);
+  const grossAmount = Math.max(0, chargeAmount);
+  const taxableBase = grossAmount / 1.05;
+  const taxAmount = grossAmount - taxableBase;
+
+  return Math.round(taxAmount * 100) / 100;
 }
 
 export function createLedgerId(spaceId: string, period: string): string {
@@ -183,9 +187,7 @@ export function buildRentBoardRecords(
       const chargeAmount = existing?.chargeAmount ?? space.monthlyRent;
       const receivedAmount =
         existing && existing.receivedAmount > 0 ? existing.receivedAmount : existing?.chargeAmount ?? 0;
-      const taxExpenseAmount =
-        existing?.taxExpenseAmount ??
-        calculateBuildingTaxExpenseAmount(chargeAmount, paidAt);
+      const taxExpenseAmount = calculateBuildingTaxExpenseAmount(chargeAmount, paidAt);
 
       return {
         id,
@@ -237,7 +239,7 @@ export function buildRentMetrics(records: RentBoardRecord[]): DashboardMetric[] 
     {
       label: "Cobrado",
       value: formatGs(totalCollected),
-      hint: `${records.filter((item) => item.isPaid).length} alquileres pagados / IVA ${formatGs(totalTaxExpense)}`,
+      hint: `${records.filter((item) => item.isPaid).length} alquileres pagados / IVA ${formatGs(totalTaxExpense, { maximumFractionDigits: 2 })}`,
       tone: "mint",
     },
     {

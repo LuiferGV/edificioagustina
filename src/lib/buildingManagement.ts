@@ -67,8 +67,25 @@ function mapSpaceToUnitState(space: BuildingSpace): UnitState {
   return space.dueDay ? "al dia" : "con saldo";
 }
 
-export function formatGs(value: number): string {
-  return `Gs. ${gsFormatter.format(Math.max(0, Math.round(value || 0)))}`;
+export function formatGs(
+  value: number,
+  options?: {
+    maximumFractionDigits?: number;
+    minimumFractionDigits?: number;
+  },
+): string {
+  const normalizedValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+
+  if (!options) {
+    return `Gs. ${gsFormatter.format(Math.round(normalizedValue))}`;
+  }
+
+  const formatter = new Intl.NumberFormat("es-PY", {
+    minimumFractionDigits: options.minimumFractionDigits ?? 0,
+    maximumFractionDigits: options.maximumFractionDigits ?? 0,
+  });
+
+  return `Gs. ${formatter.format(normalizedValue)}`;
 }
 
 export function sortSpaces(spaces: BuildingSpace[]): BuildingSpace[] {
