@@ -116,6 +116,7 @@ interface ExpenseFormState {
 type MessageTone = "" | "error" | "success";
 type ChargeFilter = "todos" | "pendientes" | "por vencer" | "vencidos" | "pagados";
 type ExpenseFilter = "todos" | "pendientes" | "pagados" | "manuales" | "iva";
+type ExpenseMetricCardKey = "total" | "paid" | "pending" | "tax";
 
 const views: Array<{ key: ViewKey; label: string }> = [
   { key: "inicio", label: "Inicio" },
@@ -154,6 +155,8 @@ const paymentMethodOptions: Array<{ value: PaymentMethod; label: string }> = [
   { value: "transferencia", label: "Transferencia" },
   { value: "cheque", label: "Cheque" },
 ];
+
+const expenseMetricCardOrder: ExpenseMetricCardKey[] = ["total", "paid", "pending", "tax"];
 
 function padNumber(value: number): string {
   return String(value).padStart(2, "0");
@@ -551,6 +554,7 @@ export default function App() {
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState | null>(null);
   const [expenseEditorBusy, setExpenseEditorBusy] = useState(false);
   const [expenseEditorError, setExpenseEditorError] = useState("");
+  const [expenseMetricModalKey, setExpenseMetricModalKey] = useState<ExpenseMetricCardKey | null>(null);
   const [seedBusy, setSeedBusy] = useState(false);
   const [pageMessage, setPageMessage] = useState("");
   const [pageMessageTone, setPageMessageTone] = useState<MessageTone>("");
@@ -772,8 +776,43 @@ export default function App() {
         paymentForm.paidAt,
       )
     : 0;
+  const expenseMetricRecordsByKey: Record<ExpenseMetricCardKey, ExpenseBoardRecord[]> = {
+    total: expenseBoardRecords,
+    paid: paidExpenseRecords,
+    pending: pendingExpenseRecords,
+    tax: taxExpenseRecords,
+  };
+  const expenseMetricModalConfig = expenseMetricModalKey
+    ? {
+        total: {
+          title: "Gastos del mes",
+          copy: "Aqui ves todos los gastos del periodo, incluyendo manuales e IVA generado.",
+          emptyMessage: "No hay gastos cargados en este periodo.",
+        },
+        paid: {
+          title: "Gastos pagados",
+          copy: "Detalle de todos los gastos que ya fueron marcados como pagados en este mes.",
+          emptyMessage: "Todavia no hay gastos pagados en este periodo.",
+        },
+        pending: {
+          title: "Gastos pendientes",
+          copy: "Detalle de los gastos del edificio que aun faltan cubrir en este mes.",
+          emptyMessage: "No hay gastos pendientes en este periodo.",
+        },
+        tax: {
+          title: "IVA generado",
+          copy: "Detalle del IVA automatico que se genera por cada alquiler cobrado.",
+          emptyMessage: "Todavia no hay IVA generado por cobros en este periodo.",
+        },
+      }[expenseMetricModalKey]
+    : null;
+  const expenseMetricModalRecords = expenseMetricModalKey
+    ? expenseMetricRecordsByKey[expenseMetricModalKey]
+    : [];
+  const expenseMetricModalTotal = expenseMetricModalRecords.reduce((sum, record) => sum + record.amount, 0);
 
   function openTenantEditor(spaceId: string) {
+    setExpenseMetricModalKey(null);
     setTenantEditorSpaceId(spaceId);
     setTenantEditorOpen(true);
     setTenantEditorError("");
@@ -800,6 +839,7 @@ export default function App() {
   }
 
   function openPaymentEditor(spaceId?: string, options?: { markPaid?: boolean }) {
+    setExpenseMetricModalKey(null);
     const fallbackSpace =
       (spaceId && chargeableSpaces.find((space) => space.id === spaceId)) ??
       overdueRecords[0]?.space ??
@@ -826,6 +866,7 @@ export default function App() {
   }
 
   function openExpenseEditor(expenseId?: string, options?: { markPaid?: boolean }) {
+    setExpenseMetricModalKey(null);
     setExpenseEditorId(expenseId ?? "");
     setExpenseEditorMarkPaid(options?.markPaid ?? false);
     setExpenseEditorOpen(true);
@@ -1755,6 +1796,18 @@ export default function App() {
     setTenantQuery,
   );
   const summaryMetrics = activeView === "gastos" ? expenseMetrics : rentMetrics;
+  const summaryCards =
+    activeView === "gastos"
+      ? summaryMetrics.map((metric, index) => ({
+          metric,
+          onClick: () => setExpenseMetricModalKey(expenseMetricCardOrder[index] ?? "total"),
+          actionLabel: "Ver gastos",
+        }))
+      : summaryMetrics.map((metric) => ({
+          metric,
+          onClick: undefined,
+          actionLabel: undefined,
+        }));
 
   return (
     <>
@@ -1866,8 +1919,13 @@ export default function App() {
         ) : null}
 
         <section className="summary-grid">
-          {summaryMetrics.map((metric) => (
-            <SummaryCard key={metric.label} metric={metric} />
+          {summaryCards.map((card) => (
+            <SummaryCard
+              key={card.metric.label}
+              metric={card.metric}
+              onClick={card.onClick}
+              actionLabel={card.actionLabel}
+            />
           ))}
         </section>
 
@@ -2600,6 +2658,47 @@ export default function App() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {expenseMetricModalKey && expenseMetricModalConfig ? (
+        <div className="modal-backdrop" onClick={() => setExpenseMetricModalKey(null)}>
+          <div className="modal-panel modal-panel--wide" onClick={handleModalCardClick}>
+            <div className="modal-panel__header">
+              <div>
+                <p className="eyebrow">{currentPeriodLabel}</p>
+                <h2>{expenseMetricModalConfig.title}</h2>
+                <p className="modal-panel__copy">{expenseMetricModalConfig.copy}</p>
+              </div>
+              <button
+                className="secondary-button secondary-button--small"
+                type="button"
+                onClick={() => setExpenseMetricModalKey(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <section className="modal-highlight-grid">
+              <article className="modal-highlight-card modal-highlight-card--primary">
+                <span>Total del recuadro</span>
+                <strong>{formatGs(expenseMetricModalTotal, { maximumFractionDigits: 2 })}</strong>
+                <p>{expenseMetricModalRecords.length} movimientos encontrados</p>
+              </article>
+
+              <article className="modal-highlight-card">
+                <span>Mes consultado</span>
+                <strong>{currentPeriodLabel}</strong>
+                <p>Detalle filtrado segun la tarjeta elegida</p>
+              </article>
+            </section>
+
+            <div className="ledger-list">
+              {expenseMetricModalRecords.length > 0
+                ? expenseMetricModalRecords.map((record) => renderExpenseRow(record))
+                : renderEmptyState("Sin movimientos", expenseMetricModalConfig.emptyMessage)}
+            </div>
           </div>
         </div>
       ) : null}
