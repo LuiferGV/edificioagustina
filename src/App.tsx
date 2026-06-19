@@ -116,6 +116,7 @@ interface ExpenseFormState {
 type MessageTone = "" | "error" | "success";
 type ChargeFilter = "todos" | "pendientes" | "por vencer" | "vencidos" | "pagados";
 type ExpenseFilter = "todos" | "pendientes" | "pagados" | "manuales" | "iva";
+type RentMetricCardKey = "total" | "paid" | "pending" | "missingDue";
 type ExpenseMetricCardKey = "total" | "paid" | "pending" | "tax";
 
 const views: Array<{ key: ViewKey; label: string }> = [
@@ -156,6 +157,7 @@ const paymentMethodOptions: Array<{ value: PaymentMethod; label: string }> = [
   { value: "cheque", label: "Cheque" },
 ];
 
+const rentMetricCardOrder: RentMetricCardKey[] = ["total", "paid", "pending", "missingDue"];
 const expenseMetricCardOrder: ExpenseMetricCardKey[] = ["total", "paid", "pending", "tax"];
 
 function padNumber(value: number): string {
@@ -548,6 +550,7 @@ export default function App() {
   const [paymentForm, setPaymentForm] = useState<PaymentFormState | null>(null);
   const [paymentEditorBusy, setPaymentEditorBusy] = useState(false);
   const [paymentEditorError, setPaymentEditorError] = useState("");
+  const [rentMetricModalKey, setRentMetricModalKey] = useState<RentMetricCardKey | null>(null);
   const [expenseEditorOpen, setExpenseEditorOpen] = useState(false);
   const [expenseEditorId, setExpenseEditorId] = useState("");
   const [expenseEditorMarkPaid, setExpenseEditorMarkPaid] = useState(false);
@@ -684,6 +687,7 @@ export default function App() {
   const overdueRecords = rentBoardRecords.filter((item) => item.isOverdue);
   const dueSoonRecords = rentBoardRecords.filter((item) => item.isDueSoon);
   const pendingWithoutDueDate = rentBoardRecords.filter((item) => item.needsDueDate);
+  const paidRecords = rentBoardRecords.filter((item) => item.status === "pagado");
   const filteredChargeRecords = rentBoardRecords
     .filter((record) => getChargeSearchText(record).includes(deferredChargeQuery.trim().toLowerCase()))
     .filter((record) => {
@@ -776,6 +780,50 @@ export default function App() {
         paymentForm.paidAt,
       )
     : 0;
+  const rentPendingRecords = rentBoardRecords.filter(
+    (record) =>
+      record.status === "pendiente" ||
+      record.status === "vencido" ||
+      record.status === "por vencer",
+  );
+  const rentMetricRecordsByKey: Record<RentMetricCardKey, RentBoardRecord[]> = {
+    total: rentBoardRecords,
+    paid: paidRecords,
+    pending: rentPendingRecords,
+    missingDue: pendingWithoutDueDate,
+  };
+  const rentMetricModalConfig = rentMetricModalKey
+    ? {
+        total: {
+          title: "Cobros del mes",
+          copy: "Aqui ves todos los alquileres activos del periodo seleccionado.",
+          emptyMessage: "No hay cobros activos en este periodo.",
+        },
+        paid: {
+          title: "Cobros pagados",
+          copy: "Detalle de los alquileres que ya fueron marcados como pagados en este mes.",
+          emptyMessage: "Todavia no hay alquileres pagados en este periodo.",
+        },
+        pending: {
+          title: "Cobros pendientes",
+          copy: "Aqui se agrupan los alquileres pendientes, por vencer y vencidos del mes.",
+          emptyMessage: "No hay alquileres pendientes en este periodo.",
+        },
+        missingDue: {
+          title: "Cobros sin vencimiento",
+          copy: "Detalle de los alquileres que todavia no tienen fecha de vencimiento cargada.",
+          emptyMessage: "Todos los alquileres visibles ya tienen vencimiento configurado.",
+        },
+      }[rentMetricModalKey]
+    : null;
+  const rentMetricModalRecords = rentMetricModalKey ? rentMetricRecordsByKey[rentMetricModalKey] : [];
+  const rentMetricModalTotal = rentMetricModalRecords.reduce((sum, record) => {
+    if (rentMetricModalKey === "paid") {
+      return sum + (record.receivedAmount || record.chargeAmount);
+    }
+
+    return sum + record.chargeAmount;
+  }, 0);
   const expenseMetricRecordsByKey: Record<ExpenseMetricCardKey, ExpenseBoardRecord[]> = {
     total: expenseBoardRecords,
     paid: paidExpenseRecords,
@@ -812,6 +860,7 @@ export default function App() {
   const expenseMetricModalTotal = expenseMetricModalRecords.reduce((sum, record) => sum + record.amount, 0);
 
   function openTenantEditor(spaceId: string) {
+    setRentMetricModalKey(null);
     setExpenseMetricModalKey(null);
     setTenantEditorSpaceId(spaceId);
     setTenantEditorOpen(true);
@@ -839,6 +888,7 @@ export default function App() {
   }
 
   function openPaymentEditor(spaceId?: string, options?: { markPaid?: boolean }) {
+    setRentMetricModalKey(null);
     setExpenseMetricModalKey(null);
     const fallbackSpace =
       (spaceId && chargeableSpaces.find((space) => space.id === spaceId)) ??
@@ -866,6 +916,7 @@ export default function App() {
   }
 
   function openExpenseEditor(expenseId?: string, options?: { markPaid?: boolean }) {
+    setRentMetricModalKey(null);
     setExpenseMetricModalKey(null);
     setExpenseEditorId(expenseId ?? "");
     setExpenseEditorMarkPaid(options?.markPaid ?? false);
@@ -1803,10 +1854,10 @@ export default function App() {
           onClick: () => setExpenseMetricModalKey(expenseMetricCardOrder[index] ?? "total"),
           actionLabel: "Ver gastos",
         }))
-      : summaryMetrics.map((metric) => ({
+      : summaryMetrics.map((metric, index) => ({
           metric,
-          onClick: undefined,
-          actionLabel: undefined,
+          onClick: () => setRentMetricModalKey(rentMetricCardOrder[index] ?? "total"),
+          actionLabel: "Ver cobranzas",
         }));
 
   return (
@@ -2658,6 +2709,47 @@ export default function App() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {rentMetricModalKey && rentMetricModalConfig ? (
+        <div className="modal-backdrop" onClick={() => setRentMetricModalKey(null)}>
+          <div className="modal-panel modal-panel--wide" onClick={handleModalCardClick}>
+            <div className="modal-panel__header">
+              <div>
+                <p className="eyebrow">{currentPeriodLabel}</p>
+                <h2>{rentMetricModalConfig.title}</h2>
+                <p className="modal-panel__copy">{rentMetricModalConfig.copy}</p>
+              </div>
+              <button
+                className="secondary-button secondary-button--small"
+                type="button"
+                onClick={() => setRentMetricModalKey(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <section className="modal-highlight-grid">
+              <article className="modal-highlight-card modal-highlight-card--primary">
+                <span>Total del recuadro</span>
+                <strong>{formatGs(rentMetricModalTotal, { maximumFractionDigits: 2 })}</strong>
+                <p>{rentMetricModalRecords.length} movimientos encontrados</p>
+              </article>
+
+              <article className="modal-highlight-card">
+                <span>Mes consultado</span>
+                <strong>{currentPeriodLabel}</strong>
+                <p>Detalle filtrado segun la tarjeta elegida</p>
+              </article>
+            </section>
+
+            <div className="ledger-list">
+              {rentMetricModalRecords.length > 0
+                ? rentMetricModalRecords.map((record) => renderRentRow(record))
+                : renderEmptyState("Sin movimientos", rentMetricModalConfig.emptyMessage)}
+            </div>
           </div>
         </div>
       ) : null}
