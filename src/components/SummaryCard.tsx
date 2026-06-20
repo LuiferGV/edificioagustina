@@ -11,10 +11,8 @@ export function SummaryCard({ metric, onClick, actionLabel = "Ver detalle" }: Su
     <>
       <p className="summary-card__label">{metric.label}</p>
       <strong className="summary-card__value">{metric.value}</strong>
-      <div className="summary-card__footer">
-        <p className="summary-card__hint">{metric.hint}</p>
-        {onClick ? <span className="summary-card__action">{actionLabel}</span> : null}
-      </div>
+      <p className="summary-card__hint">{metric.hint}</p>
+      {onClick ? <span className="summary-card__action">{actionLabel}</span> : null}
     </>
   );
 

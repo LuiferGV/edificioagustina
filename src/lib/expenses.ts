@@ -148,15 +148,12 @@ export function buildExpenseBoardRecords(
 
 export function buildExpenseMetrics(records: ExpenseBoardRecord[]): DashboardMetric[] {
   const totalAmount = records.reduce((sum, item) => sum + item.amount, 0);
-  const paidCount = records.filter((item) => item.status === "pagado").length;
   const totalPaid = records
     .filter((item) => item.status === "pagado")
     .reduce((sum, item) => sum + item.amount, 0);
-  const pendingCount = records.filter((item) => item.status === "pendiente").length;
   const totalPending = records
     .filter((item) => item.status === "pendiente")
     .reduce((sum, item) => sum + item.amount, 0);
-  const taxCount = records.filter((item) => item.source === "iva").length;
   const totalTax = records
     .filter((item) => item.source === "iva")
     .reduce((sum, item) => sum + item.amount, 0);
@@ -165,25 +162,25 @@ export function buildExpenseMetrics(records: ExpenseBoardRecord[]): DashboardMet
     {
       label: "Gastos del mes",
       value: formatGs(totalAmount, { maximumFractionDigits: 2 }),
-      hint: `${records.length} movimientos`,
+      hint: `${records.length} gastos entre manuales e IVA`,
       tone: "clay",
     },
     {
       label: "Pagados",
       value: formatGs(totalPaid, { maximumFractionDigits: 2 }),
-      hint: `${paidCount} cubiertos`,
+      hint: `${records.filter((item) => item.status === "pagado").length} gastos ya cubiertos`,
       tone: "mint",
     },
     {
       label: "Pendientes",
       value: formatGs(totalPending, { maximumFractionDigits: 2 }),
-      hint: `${pendingCount} por pagar`,
+      hint: `${records.filter((item) => item.status === "pendiente").length} gastos por pagar`,
       tone: "sun",
     },
     {
       label: "IVA generado",
       value: formatGs(totalTax, { maximumFractionDigits: 2 }),
-      hint: `${taxCount} automaticos`,
+      hint: `${records.filter((item) => item.source === "iva").length} gastos automaticos por cobros`,
       tone: "ink",
     },
   ];

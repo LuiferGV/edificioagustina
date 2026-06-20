@@ -218,7 +218,6 @@ export function buildRentBoardRecords(
 
 export function buildRentMetrics(records: RentBoardRecord[]): DashboardMetric[] {
   const totalCharged = records.reduce((sum, item) => sum + item.chargeAmount, 0);
-  const paidCount = records.filter((item) => item.isPaid).length;
   const totalCollected = records
     .filter((item) => item.isPaid)
     .reduce((sum, item) => sum + (item.receivedAmount || item.chargeAmount), 0);
@@ -234,25 +233,25 @@ export function buildRentMetrics(records: RentBoardRecord[]): DashboardMetric[] 
     {
       label: "A cobrar",
       value: formatGs(totalCharged),
-      hint: `${records.length} activos`,
+      hint: `${records.length} alquileres activos en el mes`,
       tone: "sun",
     },
     {
       label: "Cobrado",
       value: formatGs(totalCollected),
-      hint: `${paidCount} pagos · IVA ${formatGs(totalTaxExpense, { maximumFractionDigits: 2 })}`,
+      hint: `${records.filter((item) => item.isPaid).length} alquileres pagados / IVA ${formatGs(totalTaxExpense, { maximumFractionDigits: 2 })}`,
       tone: "mint",
     },
     {
       label: "Pendientes",
       value: `${pendingCount}`,
-      hint: `${overdueCount} vencidos · ${dueSoonCount} por vencer`,
+      hint: `${overdueCount} vencidos y ${dueSoonCount} por vencer`,
       tone: "clay",
     },
     {
       label: "Sin vencimiento",
       value: `${missingDueDateCount}`,
-      hint: `${missingDueDateCount} sin fecha`,
+      hint: "Espacios con alquiler sin fecha de vencimiento configurada",
       tone: "ink",
     },
   ];
