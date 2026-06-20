@@ -124,6 +124,7 @@ const views: Array<{ key: ViewKey; label: string }> = [
   { key: "cobranzas", label: "Cobranzas" },
   { key: "gastos", label: "Gastos" },
   { key: "inquilinos", label: "Inquilinos" },
+  { key: "mapa", label: "Mapa" },
 ];
 
 const chargeFilters: Array<{ key: ChargeFilter; label: string }> = [
@@ -393,9 +394,11 @@ function getToolbarSearchContent(
   activeView: ViewKey,
   chargeQuery: string,
   expenseQuery: string,
+  spaceQuery: string,
   tenantQuery: string,
   onChargeChange: (value: string) => void,
   onExpenseChange: (value: string) => void,
+  onSpaceChange: (value: string) => void,
   onTenantChange: (value: string) => void,
 ) {
   if (activeView === "gastos") {
@@ -413,6 +416,15 @@ function getToolbarSearchContent(
       placeholder: "Ej.: Gerardo, Salon 2, no se alquila",
       value: tenantQuery,
       onChange: onTenantChange,
+    };
+  }
+
+  if (activeView === "mapa") {
+    return {
+      label: "Buscar",
+      placeholder: "Ej.: Salon 4, Juan Perez, piso 2",
+      value: spaceQuery,
+      onChange: onSpaceChange,
     };
   }
 
@@ -550,7 +562,6 @@ export default function App() {
   const [paymentForm, setPaymentForm] = useState<PaymentFormState | null>(null);
   const [paymentEditorBusy, setPaymentEditorBusy] = useState(false);
   const [paymentEditorError, setPaymentEditorError] = useState("");
-  const [mapModalOpen, setMapModalOpen] = useState(false);
   const [rentMetricModalKey, setRentMetricModalKey] = useState<RentMetricCardKey | null>(null);
   const [expenseEditorOpen, setExpenseEditorOpen] = useState(false);
   const [expenseEditorId, setExpenseEditorId] = useState("");
@@ -1744,6 +1755,56 @@ export default function App() {
     );
   }
 
+  function renderMapView() {
+    return (
+      <section className="dashboard-content-stack">
+        <section className="panel dashboard-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Mapa del edificio</p>
+              <h2>Salones y departamentos</h2>
+            </div>
+            <span className="section-heading__meta">{filteredSpaces.length} visibles</span>
+          </div>
+
+          <div className="space-section-list">
+            {groupedSpaces.length > 0
+              ? groupedSpaces.map((group) => (
+                  <section className="space-group" key={group.level}>
+                    <div className="space-group__header">
+                      <div>
+                        <p className="eyebrow">Nivel</p>
+                        <h3>{group.level}</h3>
+                      </div>
+                      <span>{group.spaces.length} espacios</span>
+                    </div>
+
+                    <div className="space-grid">
+                      {group.spaces.map((space) => (
+                        <SpaceCard
+                          key={space.id}
+                          space={space}
+                          onEdit={openTenantEditor}
+                          auditLine={
+                            latestAuditBySpaceId.has(space.id)
+                              ? formatAuditLine(latestAuditBySpaceId.get(space.id))
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))
+              : renderEmptyState(
+                  "Sin espacios visibles",
+                  "No hay salones o departamentos que coincidan con la busqueda actual.",
+                )}
+          </div>
+        </section>
+      </section>
+    );
+  }
+
   if (!authReady) {
     return (
       <main className="app-shell app-shell--centered">
@@ -1783,11 +1844,14 @@ export default function App() {
     activeView,
     chargeQuery,
     expenseQuery,
+    spaceQuery,
     tenantQuery,
     setChargeQuery,
     setExpenseQuery,
+    setSpaceQuery,
     setTenantQuery,
   );
+  const shouldShowSummaryCards = activeView !== "mapa" && activeView !== "inquilinos";
   const summaryMetrics = activeView === "gastos" ? expenseMetrics : rentMetrics;
   const summaryCards =
     activeView === "gastos"
@@ -1906,13 +1970,6 @@ export default function App() {
             >
               Gasto
             </button>
-            <button
-              className="secondary-button secondary-button--small"
-              type="button"
-              onClick={() => setMapModalOpen(true)}
-            >
-              Mapa
-            </button>
           </div>
         </section>
 
@@ -1940,21 +1997,24 @@ export default function App() {
           </section>
         ) : null}
 
-        <section className="summary-grid">
-          {summaryCards.map((card) => (
-            <SummaryCard
-              key={card.metric.label}
-              metric={card.metric}
-              onClick={card.onClick}
-              actionLabel={card.actionLabel}
-            />
-          ))}
-        </section>
+        {shouldShowSummaryCards ? (
+          <section className="summary-grid">
+            {summaryCards.map((card) => (
+              <SummaryCard
+                key={card.metric.label}
+                metric={card.metric}
+                onClick={card.onClick}
+                actionLabel={card.actionLabel}
+              />
+            ))}
+          </section>
+        ) : null}
 
         {activeView === "inicio" ? renderHomeView() : null}
         {activeView === "cobranzas" ? renderCollectionsView() : null}
         {activeView === "gastos" ? renderExpensesView() : null}
         {activeView === "inquilinos" ? renderTenantsView() : null}
+        {activeView === "mapa" ? renderMapView() : null}
       </main>
 
       {tenantEditorOpen && tenantEditorSpace && spaceForm ? (
@@ -2680,71 +2740,6 @@ export default function App() {
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
-
-      {mapModalOpen ? (
-        <div className="modal-backdrop" onClick={() => setMapModalOpen(false)}>
-          <div className="modal-panel modal-panel--wide" onClick={handleModalCardClick}>
-            <div className="modal-panel__header">
-              <div>
-                <p className="eyebrow">Mapa del edificio</p>
-                <h2>Salones y departamentos</h2>
-                <p className="modal-panel__copy">Ubica un espacio y entra directo a su ficha.</p>
-              </div>
-              <button
-                className="secondary-button secondary-button--small"
-                type="button"
-                onClick={() => setMapModalOpen(false)}
-              >
-                Cerrar
-              </button>
-            </div>
-
-            <label className="search-field dashboard-search">
-              <span>Ubicar espacio</span>
-              <input
-                type="search"
-                value={spaceQuery}
-                onChange={(event) => setSpaceQuery(event.target.value)}
-                placeholder="Ej.: Salon 4, Juan Perez, Piso 2"
-              />
-            </label>
-
-            <div className="space-section-list">
-              {groupedSpaces.length > 0
-                ? groupedSpaces.map((group) => (
-                    <section className="space-group" key={group.level}>
-                      <div className="space-group__header">
-                        <div>
-                          <p className="eyebrow">Nivel</p>
-                          <h3>{group.level}</h3>
-                        </div>
-                        <span>{group.spaces.length} espacios</span>
-                      </div>
-
-                      <div className="space-grid">
-                        {group.spaces.map((space) => (
-                          <SpaceCard
-                            key={space.id}
-                            space={space}
-                            onEdit={openTenantEditor}
-                            auditLine={
-                              latestAuditBySpaceId.has(space.id)
-                                ? formatAuditLine(latestAuditBySpaceId.get(space.id))
-                                : undefined
-                            }
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ))
-                : renderEmptyState(
-                    "Sin espacios visibles",
-                    "No hay salones o departamentos que coincidan con la busqueda actual.",
-                  )}
-            </div>
           </div>
         </div>
       ) : null}

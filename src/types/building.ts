@@ -23,7 +23,7 @@ export type RentPaymentStatus =
   | "pagado"
   | "sin vencimiento";
 
-export type ViewKey = "inicio" | "cobranzas" | "gastos" | "inquilinos";
+export type ViewKey = "inicio" | "cobranzas" | "gastos" | "inquilinos" | "mapa";
 
 export interface BuildingProfile {
   name: string;
