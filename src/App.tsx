@@ -121,10 +121,10 @@ type ExpenseMetricCardKey = "total" | "paid" | "pending" | "tax";
 
 const views: Array<{ key: ViewKey; label: string }> = [
   { key: "inicio", label: "Inicio" },
+  { key: "mapa", label: "Mapa" },
   { key: "cobranzas", label: "Cobranzas" },
   { key: "gastos", label: "Gastos" },
   { key: "inquilinos", label: "Inquilinos" },
-  { key: "mapa", label: "Mapa" },
 ];
 
 const chargeFilters: Array<{ key: ChargeFilter; label: string }> = [

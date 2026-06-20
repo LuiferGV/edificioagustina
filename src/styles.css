@@ -48,6 +48,21 @@ textarea {
   font: inherit;
 }
 
+select {
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background: #101827;
+  color: var(--ink);
+}
+
+select option:checked {
+  background: linear-gradient(135deg, rgba(239, 177, 94, 0.28), rgba(86, 192, 168, 0.18));
+  color: var(--ink);
+}
+
 button {
   cursor: pointer;
 }
