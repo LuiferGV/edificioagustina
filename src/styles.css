@@ -48,21 +48,6 @@ textarea {
   font: inherit;
 }
 
-select {
-  color-scheme: dark;
-}
-
-select option,
-select optgroup {
-  background: #101827;
-  color: var(--ink);
-}
-
-select option:checked {
-  background: linear-gradient(135deg, rgba(239, 177, 94, 0.28), rgba(86, 192, 168, 0.18));
-  color: var(--ink);
-}
-
 button {
   cursor: pointer;
 }
@@ -678,7 +663,7 @@ button:disabled {
 }
 
 .dashboard-toolbar__search input,
-.dashboard-toolbar__period select {
+.dashboard-toolbar__period .app-select__trigger {
   min-height: 46px;
 }
 
@@ -1029,7 +1014,11 @@ button:disabled {
     box-shadow 180ms ease;
 }
 
-.search-field select,
+.app-select {
+  position: relative;
+}
+
+.app-select__trigger,
 .search-field textarea {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.04);
@@ -1037,9 +1026,82 @@ button:disabled {
   border-radius: 14px;
   padding: 12px 14px;
   outline: none;
+  width: 100%;
+  min-height: 48px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease;
+}
+
+.app-select__trigger {
+  cursor: pointer;
+}
+
+.app-select__value {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-select__value--placeholder {
+  color: rgba(153, 171, 192, 0.72);
+}
+
+.app-select__caret {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  transition: transform 180ms ease;
+}
+
+.app-select__caret--open {
+  transform: rotate(180deg);
+}
+
+.app-select__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 35;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: #101827;
+  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.4);
+  max-height: 260px;
+  overflow: auto;
+}
+
+.app-select__option {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.app-select__option:hover,
+.app-select__option--active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.app-select__option--selected {
+  background: rgba(86, 192, 168, 0.16);
+  color: #f7fbff;
+}
+
+.app-select__option:disabled,
+.app-select__trigger:disabled {
+  opacity: 0.54;
+  cursor: not-allowed;
 }
 
 .search-field textarea {
@@ -1048,14 +1110,13 @@ button:disabled {
 }
 
 .search-field input:focus,
-.search-field select:focus,
+.app-select--open .app-select__trigger,
 .search-field textarea:focus {
   border-color: rgba(86, 192, 168, 0.72);
   box-shadow: 0 0 0 4px rgba(86, 192, 168, 0.12);
 }
 
 .search-field input:disabled,
-.search-field select:disabled,
 .search-field textarea:disabled {
   opacity: 0.54;
   cursor: not-allowed;

@@ -15,6 +15,7 @@ import {
   type FormEvent,
   type MouseEvent,
 } from "react";
+import { AppSelect } from "./components/AppSelect";
 import { AuthPanel } from "./components/AuthPanel";
 import { BrandLogo } from "./components/BrandLogo";
 import { SpaceCard } from "./components/SpaceCard";
@@ -1932,20 +1933,19 @@ export default function App() {
 
           <label className="search-field dashboard-toolbar__period">
             <span>Mes</span>
-            <select
+            <AppSelect
               value={selectedPeriod}
-              onChange={(event) => {
-                setSelectedPeriod(event.target.value);
+              ariaLabel="Mes de trabajo"
+              options={periodOptions.map((period) => ({
+                value: period,
+                label: formatPeriodLabel(period),
+              }))}
+              onChange={(value) => {
+                setSelectedPeriod(value);
                 setChargeFilter("todos");
                 setExpenseFilter("todos");
               }}
-            >
-              {periodOptions.map((period) => (
-                <option key={period} value={period}>
-                  {formatPeriodLabel(period)}
-                </option>
-              ))}
-            </select>
+            />
           </label>
 
           <div className="dashboard-toolbar__actions">
@@ -2045,32 +2045,33 @@ export default function App() {
                 <div className="editor-grid">
                   <label className="search-field auth-form__field">
                     <span>Espacio</span>
-                    <select
+                    <AppSelect
                       value={tenantEditorSpaceId}
-                      onChange={(event) => setTenantEditorSpaceId(event.target.value)}
-                    >
-                      {allSpaces.map((space) => (
-                        <option key={space.id} value={space.id}>
-                          {space.displayName} / {space.level}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel="Espacio"
+                      options={allSpaces.map((space) => ({
+                        value: space.id,
+                        label: `${space.displayName} / ${space.level}`,
+                      }))}
+                      onChange={setTenantEditorSpaceId}
+                    />
                   </label>
 
                   <label className="search-field auth-form__field">
                     <span>Estado del espacio</span>
-                    <select
+                    <AppSelect
                       value={spaceForm.status}
-                      onChange={(event) => {
-                        const nextStatus = event.target.value as SpaceStatus;
+                      ariaLabel="Estado del espacio"
+                      options={[
+                        { value: "alquilado", label: "Alquilado" },
+                        { value: "accionista", label: "No se alquila" },
+                        { value: "disponible", label: "Disponible" },
+                        { value: "uso exclusivo", label: "Uso exclusivo" },
+                      ]}
+                      onChange={(value) => {
+                        const nextStatus = value as SpaceStatus;
                         setSpaceForm((current) => (current ? { ...current, status: nextStatus } : current));
                       }}
-                    >
-                      <option value="alquilado">Alquilado</option>
-                      <option value="accionista">No se alquila</option>
-                      <option value="disponible">Disponible</option>
-                      <option value="uso exclusivo">Uso exclusivo</option>
-                    </select>
+                    />
                   </label>
                 </div>
               </section>
@@ -2559,30 +2560,28 @@ export default function App() {
                 <div className="editor-grid">
                   <label className="search-field auth-form__field">
                     <span>Espacio</span>
-                    <select
+                    <AppSelect
                       value={paymentForm.spaceId}
-                      onChange={(event) => refreshPaymentForm(event.target.value, paymentForm.period)}
-                    >
-                      {chargeableSpaces.map((space) => (
-                        <option key={space.id} value={space.id}>
-                          {space.displayName} / {formatResponsibleName(space.paymentResponsible)}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel="Espacio"
+                      options={chargeableSpaces.map((space) => ({
+                        value: space.id,
+                        label: `${space.displayName} / ${formatResponsibleName(space.paymentResponsible)}`,
+                      }))}
+                      onChange={(value) => refreshPaymentForm(value, paymentForm.period)}
+                    />
                   </label>
 
                   <label className="search-field auth-form__field">
                     <span>Mes a cobrar</span>
-                    <select
+                    <AppSelect
                       value={paymentForm.period}
-                      onChange={(event) => refreshPaymentForm(paymentForm.spaceId, event.target.value)}
-                    >
-                      {periodOptions.map((period) => (
-                        <option key={period} value={period}>
-                          {formatPeriodLabel(period)}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel="Mes a cobrar"
+                      options={periodOptions.map((period) => ({
+                        value: period,
+                        label: formatPeriodLabel(period),
+                      }))}
+                      onChange={(value) => refreshPaymentForm(paymentForm.spaceId, value)}
+                    />
                   </label>
                 </div>
 
@@ -2644,26 +2643,27 @@ export default function App() {
 
                   <label className="search-field auth-form__field">
                     <span>Metodo de pago</span>
-                    <select
+                    <AppSelect
                       value={paymentForm.paymentMethod}
-                      onChange={(event) =>
+                      ariaLabel="Metodo de pago"
+                      options={[
+                        { value: "", label: "Seleccionar" },
+                        ...paymentMethodOptions.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        })),
+                      ]}
+                      onChange={(value) =>
                         setPaymentForm((current) =>
                           current
                             ? {
                                 ...current,
-                                paymentMethod: event.target.value as PaymentMethod | "",
+                                paymentMethod: value as PaymentMethod | "",
                               }
                             : current,
                         )
                       }
-                    >
-                      <option value="">Seleccionar</option>
-                      {paymentMethodOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
 
                   <label className="search-field auth-form__field">
@@ -2855,40 +2855,38 @@ export default function App() {
                 <div className="editor-grid">
                   <label className="search-field auth-form__field">
                     <span>Mes del gasto</span>
-                    <select
+                    <AppSelect
                       value={expenseForm.period}
-                      onChange={(event) =>
+                      ariaLabel="Mes del gasto"
+                      options={periodOptions.map((period) => ({
+                        value: period,
+                        label: formatPeriodLabel(period),
+                      }))}
+                      onChange={(value) =>
                         setExpenseForm((current) =>
-                          current ? { ...current, period: event.target.value } : current,
+                          current ? { ...current, period: value } : current,
                         )
                       }
-                    >
-                      {periodOptions.map((period) => (
-                        <option key={period} value={period}>
-                          {formatPeriodLabel(period)}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
 
                   <label className="search-field auth-form__field">
                     <span>Categoria</span>
-                    <select
+                    <AppSelect
                       value={expenseForm.category}
-                      onChange={(event) =>
+                      ariaLabel="Categoria"
+                      options={expenseCategoryOptions.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      onChange={(value) =>
                         setExpenseForm((current) =>
                           current
-                            ? { ...current, category: event.target.value as ExpenseCategory }
+                            ? { ...current, category: value as ExpenseCategory }
                             : current,
                         )
                       }
-                    >
-                      {expenseCategoryOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
                 </div>
 
