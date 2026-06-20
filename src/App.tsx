@@ -400,7 +400,7 @@ function getToolbarSearchContent(
 ) {
   if (activeView === "gastos") {
     return {
-      label: "Buscar gasto o categoria",
+      label: "Buscar",
       placeholder: "Ej.: luz, limpieza, IVA, contador",
       value: expenseQuery,
       onChange: onExpenseChange,
@@ -409,7 +409,7 @@ function getToolbarSearchContent(
 
   if (activeView === "inquilinos") {
     return {
-      label: "Buscar inquilino o espacio",
+      label: "Buscar",
       placeholder: "Ej.: Gerardo, Salon 2, no se alquila",
       value: tenantQuery,
       onChange: onTenantChange,
@@ -417,7 +417,7 @@ function getToolbarSearchContent(
   }
 
   return {
-    label: "Buscar cobro, nombre o estado",
+    label: "Buscar",
     placeholder: "Ej.: Dto 2.3, Mario, vencido",
     value: chargeQuery,
     onChange: onChargeChange,
@@ -1339,34 +1339,37 @@ export default function App() {
       <article className="ledger-row" key={record.id}>
         <div className="ledger-row__main">
           <div className="ledger-row__identity">
-            <p className="eyebrow">
-              {record.spaceLevel} / {record.spaceName}
-            </p>
+            <div className="ledger-row__headline">
+              <p className="eyebrow">{record.spaceLevel}</p>
+              <StatusPill value={record.statusLabel} />
+            </div>
             <h3>{record.residentName}</h3>
-            <p>
-              {formatGs(record.chargeAmount)} / {record.spaceName}
-            </p>
+            <p>{record.spaceName}</p>
           </div>
 
           <div className="ledger-row__meta">
             <div>
-              <span>Vencimiento</span>
+              <span>Alquiler</span>
+              <strong>{formatGs(record.chargeAmount)}</strong>
+            </div>
+            <div>
+              <span>Vence</span>
               <strong>{record.dueText}</strong>
             </div>
             <div>
               <span>Pago</span>
-              <strong>{record.paidAt || "No registrado"}</strong>
+              <strong>{record.paidAt || "Pendiente"}</strong>
             </div>
-            <div>
-              <span>IVA edificio</span>
-              <strong>
-                {record.taxExpenseAmount > 0
-                  ? formatGs(record.taxExpenseAmount, { maximumFractionDigits: 2 })
-                  : "Se genera al pagar"}
-              </strong>
-            </div>
-            <StatusPill value={record.statusLabel} />
           </div>
+        </div>
+
+        <div className="ledger-row__submeta">
+          <span>IVA</span>
+          <strong>
+            {record.taxExpenseAmount > 0
+              ? formatGs(record.taxExpenseAmount, { maximumFractionDigits: 2 })
+              : "Se genera al pagar"}
+          </strong>
         </div>
 
         <div className="ledger-row__actions">
@@ -1375,14 +1378,14 @@ export default function App() {
             type="button"
             onClick={() => openTenantEditor(record.spaceId)}
           >
-            Editar inquilino
+            Ficha
           </button>
           <button
             className="secondary-button secondary-button--small"
             type="button"
             onClick={() => openPaymentEditor(record.spaceId)}
           >
-            Registrar pago
+            Cobro
           </button>
           {!record.isPaid ? (
             <button
@@ -1443,9 +1446,12 @@ export default function App() {
       <article className="ledger-row" key={record.id}>
         <div className="ledger-row__main">
           <div className="ledger-row__identity">
-            <p className="eyebrow">
-              {record.sourceLabel} / {record.categoryLabel}
-            </p>
+            <div className="ledger-row__headline">
+              <p className="eyebrow">
+                {record.sourceLabel} / {record.categoryLabel}
+              </p>
+              <StatusPill value={record.statusLabel} />
+            </div>
             <h3>{record.title}</h3>
             <p>{record.linkedSpaceName || "Gasto general del edificio"}</p>
           </div>
@@ -1465,9 +1471,8 @@ export default function App() {
             </div>
             <div>
               <span>Pago</span>
-              <strong>{record.paidAt || "No registrado"}</strong>
+              <strong>{record.paidAt || "Pendiente"}</strong>
             </div>
-            <StatusPill value={record.statusLabel} />
           </div>
         </div>
 
@@ -1507,12 +1512,9 @@ export default function App() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Gastos</p>
-                <h2>Control de gastos del edificio</h2>
+                <h2>Gastos del mes</h2>
               </div>
-              <p className="section-copy">
-                Aqui separas los gastos del edificio de las cobranzas: limpieza, luz, contador,
-                administrador y el IVA automatico que genera cada alquiler cobrado.
-              </p>
+              <span className="section-heading__meta">{filteredExpenseRecords.length} visibles</span>
             </div>
 
             <div className="toolbar-row">
@@ -1542,19 +1544,19 @@ export default function App() {
 
           <div className="dashboard-side">
             {renderExpenseSideList(
-              "Pendientes del mes",
+              "Pendientes",
               pendingExpenseRecords,
-              "No hay gastos pendientes en el periodo seleccionado.",
+              "Sin pendientes.",
             )}
             {renderExpenseSideList(
               "IVA generado",
               taxExpenseRecords,
-              "Todavia no hay IVA generado por alquileres cobrados en este mes.",
+              "Sin IVA generado.",
             )}
             {renderExpenseSideList(
-              "Gastos pagados",
+              "Pagados",
               paidExpenseRecords,
-              "Aun no hay gastos marcados como pagados en este mes.",
+              "Sin pagos registrados.",
             )}
           </div>
         </section>
@@ -1569,12 +1571,10 @@ export default function App() {
           <div className="panel dashboard-panel">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Control mensual</p>
-                <h2>Cobros del mes en curso</h2>
+                <p className="eyebrow">Hoy</p>
+                <h2>Mes en curso</h2>
               </div>
-              <p className="section-copy">
-                Aqui operas el mes: ves quien debe, quien ya pago y quien esta por vencer.
-              </p>
+              <span className="section-heading__meta">{filteredChargeRecords.length} cobros</span>
             </div>
 
             <div className="ledger-list">
@@ -1591,17 +1591,17 @@ export default function App() {
             {renderMiniChargeList(
               "Vencidos",
               overdueRecords,
-              "No hay alquileres vencidos en el periodo seleccionado.",
+              "Sin vencidos.",
             )}
             {renderMiniChargeList(
               "Por vencer",
               dueSoonRecords,
-              "No hay alquileres cerca del vencimiento en este mes.",
+              "Sin proximos.",
             )}
             {renderMiniChargeList(
-              "Falta cargar vencimiento",
+              "Sin vencimiento",
               pendingWithoutDueDate,
-              "Todos los alquileres visibles ya tienen vencimiento configurado.",
+              "Todo cargado.",
             )}
           </div>
         </section>
@@ -1609,16 +1609,14 @@ export default function App() {
         <section className="panel dashboard-panel">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Mapa del edificio</p>
-              <h2>Ubicacion fisica de salones y departamentos</h2>
+              <p className="eyebrow">Mapa</p>
+              <h2>Espacios del edificio</h2>
             </div>
-            <p className="section-copy">
-              Este mapa sirve para ubicar rapido el espacio y entrar a su carga o edicion.
-            </p>
+            <span className="section-heading__meta">{filteredSpaces.length} visibles</span>
           </div>
 
           <label className="search-field dashboard-search">
-            <span>Buscar espacio o responsable</span>
+            <span>Buscar espacio</span>
             <input
                 type="search"
                 value={spaceQuery}
@@ -1634,7 +1632,6 @@ export default function App() {
                     <div className="space-group__header">
                       <div>
                         <p className="eyebrow">{group.level}</p>
-                        <h3>{group.level}</h3>
                       </div>
                       <span>{group.spaces.length} espacios</span>
                     </div>
@@ -1672,11 +1669,9 @@ export default function App() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Cobranzas</p>
-              <h2>Seguimiento mensual por alquiler</h2>
+              <h2>Cobranza mensual</h2>
             </div>
-            <p className="section-copy">
-              Filtra por estado y registra pagos o vencimientos para cada espacio.
-            </p>
+            <span className="section-heading__meta">{filteredChargeRecords.length} visibles</span>
           </div>
 
           <div className="toolbar-row">
@@ -1714,11 +1709,9 @@ export default function App() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Inquilinos</p>
-              <h2>Listado para editar fichas y contratos</h2>
+              <h2>Fichas de inquilinos</h2>
             </div>
-            <p className="section-copy">
-              Desde aqui ajustas datos del titular, otros ocupantes, alquiler y vencimientos.
-            </p>
+            <span className="section-heading__meta">{tenantSpaces.length} espacios</span>
           </div>
 
           <div className="tenant-admin-list">
@@ -1744,11 +1737,11 @@ export default function App() {
                             <strong>{space.monthlyRent > 0 ? formatGs(space.monthlyRent) : "Sin cobro"}</strong>
                           </div>
                           <div>
-                            <span>Vencimiento</span>
+                            <span>Vence</span>
                             <strong>{dueLabel}</strong>
                           </div>
                           <div>
-                            <span>Estacionamiento</span>
+                            <span>Parking</span>
                             <strong>
                               {space.hasParking
                                 ? space.parkingFee > 0
@@ -1758,7 +1751,7 @@ export default function App() {
                             </strong>
                           </div>
                           <div>
-                            <span>Mes actual</span>
+                            <span>Estado</span>
                             <strong>
                               {isNotForRent(space)
                                 ? "No se alquila"
@@ -1778,14 +1771,14 @@ export default function App() {
                           onClick={() => openPaymentEditor(space.id)}
                           disabled={space.status !== "alquilado" || space.monthlyRent <= 0}
                         >
-                          Registrar pago
+                          Cobro
                         </button>
                         <button
                           className="primary-button primary-button--small"
                           type="button"
                           onClick={() => openTenantEditor(space.id)}
                         >
-                          Editar ficha
+                          Ficha
                         </button>
                       </div>
                       {renderAuditNote(latestAuditBySpaceId.get(space.id) ?? null)}
@@ -1852,12 +1845,12 @@ export default function App() {
       ? summaryMetrics.map((metric, index) => ({
           metric,
           onClick: () => setExpenseMetricModalKey(expenseMetricCardOrder[index] ?? "total"),
-          actionLabel: "Ver gastos",
+          actionLabel: "Abrir",
         }))
       : summaryMetrics.map((metric, index) => ({
           metric,
           onClick: () => setRentMetricModalKey(rentMetricCardOrder[index] ?? "total"),
-          actionLabel: "Ver cobranzas",
+          actionLabel: "Abrir",
         }));
 
   return (
@@ -1872,8 +1865,12 @@ export default function App() {
               <BrandLogo className="brand-logo brand-logo--header" />
 
               <div className="dashboard-header__brand-copy">
-                <p className="eyebrow">Panel administrativo</p>
-                <p>{currentPeriodLabel} / {user.email ?? "Sesion activa"}</p>
+                <div className="dashboard-header__meta">
+                  <span className="dashboard-badge">{currentPeriodLabel}</span>
+                  <span className="dashboard-badge dashboard-badge--muted">
+                    {user.email ?? "Sesion activa"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1903,45 +1900,64 @@ export default function App() {
             />
           </label>
 
-          <label className="search-field dashboard-toolbar__period">
-            <span>Mes de trabajo</span>
-            <select
-              value={selectedPeriod}
-              onChange={(event) => {
-                setSelectedPeriod(event.target.value);
-                setChargeFilter("todos");
-                setExpenseFilter("todos");
-              }}
-            >
-              {periodOptions.map((period) => (
-                <option key={period} value={period}>
-                  {formatPeriodLabel(period)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="dashboard-toolbar__utility">
+            <label className="search-field dashboard-toolbar__period">
+              <span>Mes</span>
+              <select
+                value={selectedPeriod}
+                onChange={(event) => {
+                  setSelectedPeriod(event.target.value);
+                  setChargeFilter("todos");
+                  setExpenseFilter("todos");
+                }}
+              >
+                {periodOptions.map((period) => (
+                  <option key={period} value={period}>
+                    {formatPeriodLabel(period)}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <div className="dashboard-toolbar__actions">
-            <button className="primary-button primary-button--small" type="button" onClick={openTenantEditorFromHeader}>
-              Cargar inquilino
-            </button>
-            <button className="secondary-button secondary-button--small" type="button" onClick={() => openPaymentEditor()}>
-              Registrar pago
-            </button>
-            <button className="secondary-button secondary-button--small" type="button" onClick={() => openExpenseEditor()}>
-              Cargar gasto
-            </button>
-            <button
-              className="secondary-button secondary-button--small"
-              type="button"
-              onClick={handleSeedDatabase}
-              disabled={seedBusy}
-            >
-              {seedBusy ? "Cargando..." : "Cargar estructura inicial"}
-            </button>
-            <button className="secondary-button secondary-button--small" type="button" onClick={handleLogout} disabled={authBusy}>
-              Cerrar sesion
-            </button>
+            <div className="dashboard-toolbar__actions">
+              <button
+                className="primary-button primary-button--small"
+                type="button"
+                onClick={openTenantEditorFromHeader}
+              >
+                Nuevo inquilino
+              </button>
+              <button
+                className="secondary-button secondary-button--small"
+                type="button"
+                onClick={() => openPaymentEditor()}
+              >
+                Cobro
+              </button>
+              <button
+                className="secondary-button secondary-button--small"
+                type="button"
+                onClick={() => openExpenseEditor()}
+              >
+                Gasto
+              </button>
+              <button
+                className="secondary-button secondary-button--small"
+                type="button"
+                onClick={handleSeedDatabase}
+                disabled={seedBusy}
+              >
+                {seedBusy ? "Cargando..." : "Estructura"}
+              </button>
+              <button
+                className="secondary-button secondary-button--small"
+                type="button"
+                onClick={handleLogout}
+                disabled={authBusy}
+              >
+                Salir
+              </button>
+            </div>
           </div>
         </section>
 
