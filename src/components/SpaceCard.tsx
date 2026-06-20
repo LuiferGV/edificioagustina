@@ -17,9 +17,17 @@ export function SpaceCard({ space, onEdit, auditLine }: SpaceCardProps) {
   const responsibleName = formatResponsibleName(space.paymentResponsible);
   const rentLabel = getSpaceChargeLabel(space);
   const nonRentable = isNotForRent(space);
+  const dueLabel = space.dueDay ? `Dia ${space.dueDay}` : "Sin vencimiento";
+  const extraOccupantsLabel =
+    space.additionalOccupants.length > 0 ? `${space.additionalOccupants.length} adicionales` : "";
+  const parkingLabel = space.hasParking
+    ? space.parkingFee > 0
+      ? `Parking ${space.parkingFee.toLocaleString("es-PY")}`
+      : "Parking pendiente"
+    : "";
 
   const actionLabel =
-    space.status === "disponible" ? "Cargar" : space.type === "terraza" ? "Ver datos" : "Editar";
+    space.status === "disponible" ? "Cargar" : space.type === "terraza" ? "Ver" : "Abrir";
 
   return (
     <article className="space-card">
@@ -36,15 +44,12 @@ export function SpaceCard({ space, onEdit, auditLine }: SpaceCardProps) {
 
       <div className="space-card__body">
         <strong>{responsibleName}</strong>
-        <p>{rentLabel}</p>
-        {nonRentable ? (
-          <p>Espacio reservado / no genera alquiler</p>
-        ) : (
-          <p>
-            {space.additionalOccupants.length} ocupantes extra /{" "}
-            {space.dueDay ? `vence dia ${space.dueDay}` : "sin vencimiento"}
-          </p>
-        )}
+        <p className="space-card__charge">{rentLabel}</p>
+        <div className="space-card__meta">
+          <span>{nonRentable ? "No genera cobro" : dueLabel}</span>
+          {!nonRentable && extraOccupantsLabel ? <span>{extraOccupantsLabel}</span> : null}
+          {parkingLabel ? <span>{parkingLabel}</span> : null}
+        </div>
         {auditLine ? <p className="audit-note">{auditLine}</p> : null}
       </div>
 
