@@ -550,6 +550,7 @@ export default function App() {
   const [paymentForm, setPaymentForm] = useState<PaymentFormState | null>(null);
   const [paymentEditorBusy, setPaymentEditorBusy] = useState(false);
   const [paymentEditorError, setPaymentEditorError] = useState("");
+  const [mapModalOpen, setMapModalOpen] = useState(false);
   const [rentMetricModalKey, setRentMetricModalKey] = useState<RentMetricCardKey | null>(null);
   const [expenseEditorOpen, setExpenseEditorOpen] = useState(false);
   const [expenseEditorId, setExpenseEditorId] = useState("");
@@ -1606,60 +1607,6 @@ export default function App() {
             )}
           </div>
         </section>
-
-        <section className="panel dashboard-panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Mapa</p>
-              <h2>Salones y departamentos</h2>
-            </div>
-            <span className="section-heading__meta">{filteredSpaces.length} visibles</span>
-          </div>
-
-          <label className="search-field dashboard-search">
-            <span>Ubicar espacio</span>
-            <input
-              type="search"
-              value={spaceQuery}
-              onChange={(event) => setSpaceQuery(event.target.value)}
-              placeholder="Ej.: Salon 4, Juan Perez, Piso 2"
-            />
-          </label>
-
-          <div className="space-section-list">
-            {groupedSpaces.length > 0
-              ? groupedSpaces.map((group) => (
-                  <section className="space-group" key={group.level}>
-                    <div className="space-group__header">
-                      <div>
-                        <p className="eyebrow">Nivel</p>
-                        <h3>{group.level}</h3>
-                      </div>
-                      <span>{group.spaces.length} espacios</span>
-                    </div>
-
-                    <div className="space-grid">
-                      {group.spaces.map((space) => (
-                        <SpaceCard
-                          key={space.id}
-                          space={space}
-                          onEdit={openTenantEditor}
-                          auditLine={
-                            latestAuditBySpaceId.has(space.id)
-                              ? formatAuditLine(latestAuditBySpaceId.get(space.id))
-                              : undefined
-                          }
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ))
-              : renderEmptyState(
-                  "Sin espacios visibles",
-                  "No hay salones o departamentos que coincidan con la busqueda actual.",
-                )}
-          </div>
-        </section>
       </section>
     );
   }
@@ -1958,6 +1905,13 @@ export default function App() {
               onClick={() => openExpenseEditor()}
             >
               Gasto
+            </button>
+            <button
+              className="secondary-button secondary-button--small"
+              type="button"
+              onClick={() => setMapModalOpen(true)}
+            >
+              Mapa
             </button>
           </div>
         </section>
@@ -2726,6 +2680,71 @@ export default function App() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {mapModalOpen ? (
+        <div className="modal-backdrop" onClick={() => setMapModalOpen(false)}>
+          <div className="modal-panel modal-panel--wide" onClick={handleModalCardClick}>
+            <div className="modal-panel__header">
+              <div>
+                <p className="eyebrow">Mapa del edificio</p>
+                <h2>Salones y departamentos</h2>
+                <p className="modal-panel__copy">Ubica un espacio y entra directo a su ficha.</p>
+              </div>
+              <button
+                className="secondary-button secondary-button--small"
+                type="button"
+                onClick={() => setMapModalOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <label className="search-field dashboard-search">
+              <span>Ubicar espacio</span>
+              <input
+                type="search"
+                value={spaceQuery}
+                onChange={(event) => setSpaceQuery(event.target.value)}
+                placeholder="Ej.: Salon 4, Juan Perez, Piso 2"
+              />
+            </label>
+
+            <div className="space-section-list">
+              {groupedSpaces.length > 0
+                ? groupedSpaces.map((group) => (
+                    <section className="space-group" key={group.level}>
+                      <div className="space-group__header">
+                        <div>
+                          <p className="eyebrow">Nivel</p>
+                          <h3>{group.level}</h3>
+                        </div>
+                        <span>{group.spaces.length} espacios</span>
+                      </div>
+
+                      <div className="space-grid">
+                        {group.spaces.map((space) => (
+                          <SpaceCard
+                            key={space.id}
+                            space={space}
+                            onEdit={openTenantEditor}
+                            auditLine={
+                              latestAuditBySpaceId.has(space.id)
+                                ? formatAuditLine(latestAuditBySpaceId.get(space.id))
+                                : undefined
+                            }
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                : renderEmptyState(
+                    "Sin espacios visibles",
+                    "No hay salones o departamentos que coincidan con la busqueda actual.",
+                  )}
+            </div>
           </div>
         </div>
       ) : null}
