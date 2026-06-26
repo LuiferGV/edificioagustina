@@ -23,6 +23,14 @@ import { StatusPill } from "./components/StatusPill";
 import { SummaryCard } from "./components/SummaryCard";
 import { buildingSnapshot as demoSnapshot } from "./data/mockBuilding";
 import {
+  buildBackupPayload,
+  createStoredBackupRecord,
+  getBackupDateKey,
+  getBackupTriggerLabel,
+  parseBackupRecords,
+  type BackupRecord,
+} from "./lib/backups";
+import {
   formatGs,
   formatResponsibleName,
   getSpaceStatusLabel,
@@ -177,6 +185,22 @@ function formatDateForStorage(referenceDate = new Date()): string {
   return `${referenceDate.getFullYear()}-${padNumber(referenceDate.getMonth() + 1)}-${padNumber(
     referenceDate.getDate(),
   )}`;
+}
+
+function formatDateTimeLabel(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function getAuthMessage(error: unknown): string {
@@ -601,6 +625,8 @@ export default function App() {
   const [chargeFilter, setChargeFilter] = useState<ChargeFilter>("todos");
   const [expenseFilter, setExpenseFilter] = useState<ExpenseFilter>("todos");
   const [snapshot, setSnapshot] = useState(demoSnapshot);
+  const [snapshotSource, setSnapshotSource] = useState<"firebase" | "demo">("demo");
+  const [backupRecords, setBackupRecords] = useState<BackupRecord[]>([]);
   const [tenantEditorOpen, setTenantEditorOpen] = useState(false);
   const [tenantEditorSpaceId, setTenantEditorSpaceId] = useState("");
   const [spaceForm, setSpaceForm] = useState<SpaceFormState | null>(null);
@@ -621,6 +647,11 @@ export default function App() {
   const [expenseEditorBusy, setExpenseEditorBusy] = useState(false);
   const [expenseEditorError, setExpenseEditorError] = useState("");
   const [expenseMetricModalKey, setExpenseMetricModalKey] = useState<ExpenseMetricCardKey | null>(null);
+  const [backupManagerOpen, setBackupManagerOpen] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupError, setBackupError] = useState("");
+  const [backupRestoreTargetId, setBackupRestoreTargetId] = useState("");
+  const [autoBackupAttemptDateKey, setAutoBackupAttemptDateKey] = useState("");
   const [pageMessage, setPageMessage] = useState("");
   const [pageMessageTone, setPageMessageTone] = useState<MessageTone>("");
 
@@ -631,9 +662,12 @@ export default function App() {
 
   const applyRemoteSnapshot = useEffectEvent((raw: unknown) => {
     const resolved = resolveBuildingSnapshot(raw);
+    const nextBackups = parseBackupRecords(raw);
 
     startTransition(() => {
       setSnapshot(resolved.snapshot);
+      setSnapshotSource(resolved.source);
+      setBackupRecords(nextBackups);
       setDatabaseError("");
     });
   });
@@ -641,6 +675,8 @@ export default function App() {
   const applyDatabaseFailure = useEffectEvent((message: string) => {
     startTransition(() => {
       setSnapshot(demoSnapshot);
+      setSnapshotSource("demo");
+      setBackupRecords([]);
       setDatabaseError(message);
     });
   });
@@ -662,6 +698,9 @@ export default function App() {
     if (!user) {
       startTransition(() => {
         setSnapshot(demoSnapshot);
+        setSnapshotSource("demo");
+        setBackupRecords([]);
+        setAutoBackupAttemptDateKey("");
         setDatabaseError("");
       });
 
@@ -680,6 +719,37 @@ export default function App() {
 
     return unsubscribe;
   }, [user]);
+
+  useEffect(() => {
+    if (!user || snapshotSource !== "firebase") {
+      return;
+    }
+
+    const todayKey = getBackupDateKey(new Date());
+    const hasAutomaticBackupToday = backupRecords.some(
+      (backup) => backup.trigger === "auto-daily" && backup.dateKey === todayKey,
+    );
+
+    if (hasAutomaticBackupToday || autoBackupAttemptDateKey === todayKey) {
+      return;
+    }
+
+    setAutoBackupAttemptDateKey(todayKey);
+
+    const autoBackup = createStoredBackupRecord({
+      actor: user,
+      note: "Resguardo diario automatico del sistema.",
+      snapshot,
+      trigger: "auto-daily",
+    });
+
+    void update(ref(database), {
+      [`backups/${autoBackup.id}`]: autoBackup,
+    }).catch(() => {
+      setPageMessage("No se pudo generar el resguardo diario automatico.");
+      setPageMessageTone("error");
+    });
+  }, [autoBackupAttemptDateKey, backupRecords, snapshot, snapshotSource, user]);
 
   const allSpaces = snapshot.spaces;
   const chargeableSpaces = allSpaces.filter((space) => space.status === "alquilado" && space.monthlyRent > 0);
@@ -948,6 +1018,7 @@ export default function App() {
     ? expenseMetricRecordsByKey[expenseMetricModalKey]
     : [];
   const expenseMetricModalTotal = expenseMetricModalRecords.reduce((sum, record) => sum + record.amount, 0);
+  const restoreTargetBackup = backupRecords.find((backup) => backup.id === backupRestoreTargetId) ?? null;
 
   function openTenantEditor(spaceId: string) {
     setRentMetricModalKey(null);
@@ -1022,6 +1093,102 @@ export default function App() {
     setExpenseEditorMarkPaid(false);
     setExpenseForm(null);
     setExpenseEditorError("");
+  }
+
+  function closeBackupManager() {
+    setBackupManagerOpen(false);
+    setBackupError("");
+    setBackupRestoreTargetId("");
+  }
+
+  async function handleCreateManualBackup() {
+    if (!user || snapshotSource !== "firebase") {
+      return;
+    }
+
+    setBackupBusy(true);
+    setBackupError("");
+
+    try {
+      const backupRecord = createStoredBackupRecord({
+        actor: user,
+        note: "Resguardo manual generado desde el panel.",
+        snapshot,
+        trigger: "manual",
+      });
+
+      await update(ref(database), {
+        [`backups/${backupRecord.id}`]: backupRecord,
+      });
+
+      setPageMessage(`Resguardo manual creado: ${formatDateTimeLabel(backupRecord.createdAt)}.`);
+      setPageMessageTone("success");
+    } catch {
+      setBackupError("No se pudo crear el resguardo manual.");
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  async function handleRestoreBackup() {
+    if (!user || snapshotSource !== "firebase") {
+      return;
+    }
+
+    const targetBackup = backupRecords.find((backup) => backup.id === backupRestoreTargetId) ?? null;
+
+    if (!targetBackup) {
+      return;
+    }
+
+    setBackupBusy(true);
+    setBackupError("");
+
+    try {
+      const preRestoreBackup = createStoredBackupRecord({
+        actor: user,
+        note: `Estado previo a restaurar el resguardo del ${formatDateTimeLabel(targetBackup.createdAt)}.`,
+        snapshot,
+        trigger: "pre-restore",
+      });
+      const restoredPayload = buildBackupPayload(targetBackup.snapshot);
+      const restoreAuditEntry = createAuditEntry({
+        actor: user,
+        entityId: `restore-${targetBackup.id}`,
+        entityType: "system",
+        spaceId: "__system__",
+        action: "Restauro sistema",
+        summary: `restauro el sistema desde el resguardo del ${formatDateTimeLabel(targetBackup.createdAt)}`,
+      });
+
+      await update(ref(database), {
+        profile: restoredPayload.profile,
+        metrics: restoredPayload.metrics,
+        spaces: restoredPayload.spaces,
+        rentLedger: restoredPayload.rentLedger,
+        expenses: restoredPayload.expenses,
+        auditLog: {
+          ...restoredPayload.auditLog,
+          [restoreAuditEntry.id]: restoreAuditEntry,
+        },
+        units: restoredPayload.units,
+        collections: restoredPayload.collections,
+        incidents: restoredPayload.incidents,
+        announcements: restoredPayload.announcements,
+        agenda: restoredPayload.agenda,
+        [`backups/${preRestoreBackup.id}`]: preRestoreBackup,
+      });
+
+      setPageMessage(
+        `Sistema restaurado desde el resguardo del ${formatDateTimeLabel(targetBackup.createdAt)}. Se genero un backup previo de seguridad.`,
+      );
+      setPageMessageTone("success");
+      closeBackupManager();
+    } catch {
+      setBackupError("No se pudo restaurar el resguardo seleccionado.");
+    } finally {
+      setBackupBusy(false);
+    }
   }
 
   function refreshPaymentForm(nextSpaceId: string, nextPeriod: string) {
@@ -2070,6 +2237,13 @@ export default function App() {
             <button
               className="secondary-button secondary-button--small"
               type="button"
+              onClick={() => setBackupManagerOpen(true)}
+            >
+              Resguardos
+            </button>
+            <button
+              className="secondary-button secondary-button--small"
+              type="button"
               onClick={handleLogout}
               disabled={authBusy}
             >
@@ -2174,6 +2348,115 @@ export default function App() {
         {activeView === "inquilinos" ? renderTenantsView() : null}
         {activeView === "mapa" ? renderMapView() : null}
       </main>
+
+      {backupManagerOpen ? (
+        <div className="modal-backdrop" onClick={closeBackupManager}>
+          <div className="modal-panel modal-panel--wide" onClick={handleModalCardClick}>
+            <div className="modal-panel__header">
+              <div>
+                <p className="eyebrow">Panel administrativo</p>
+                <h2>Resguardos del sistema</h2>
+                <p className="modal-panel__copy">
+                  Se crea un resguardo diario automatico al primer ingreso del dia y aqui puedes
+                  generar uno manual o restaurar un estado anterior.
+                </p>
+              </div>
+              <button className="secondary-button secondary-button--small" type="button" onClick={closeBackupManager}>
+                Cerrar
+              </button>
+            </div>
+
+            <section className="backup-admin-panel">
+              <article className="backup-admin-summary">
+                <div>
+                  <p className="eyebrow">Seguridad de datos</p>
+                  <h3>Backups restaurables</h3>
+                  <p>
+                    Antes de cada restauracion, el sistema crea automaticamente un resguardo
+                    preventivo del estado actual.
+                  </p>
+                </div>
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={handleCreateManualBackup}
+                  disabled={backupBusy || snapshotSource !== "firebase"}
+                >
+                  {backupBusy ? "Procesando..." : "Crear resguardo ahora"}
+                </button>
+              </article>
+
+              {backupError ? <p className="form-error">{backupError}</p> : null}
+
+              <div className="backup-list">
+                {backupRecords.length > 0
+                  ? backupRecords.map((backup) => (
+                      <article className="backup-card" key={backup.id}>
+                        <div className="backup-card__head">
+                          <div>
+                            <p className="eyebrow">{getBackupTriggerLabel(backup.trigger)}</p>
+                            <h3>{formatDateTimeLabel(backup.createdAt)}</h3>
+                            <p className="backup-card__note">{backup.note}</p>
+                          </div>
+                          <span className="section-heading__meta">{backup.actorEmail}</span>
+                        </div>
+
+                        <div className="backup-card__meta">
+                          <span>{backup.snapshot.spaces.length} espacios</span>
+                          <span>{backup.snapshot.rentLedger.length} cobranzas</span>
+                          <span>{backup.snapshot.expenses.length} gastos</span>
+                          <span>{backup.snapshot.auditLog.length} movimientos</span>
+                        </div>
+
+                        {restoreTargetBackup?.id === backup.id ? (
+                          <div className="backup-card__confirm">
+                            <p>
+                              Esta restauracion reemplazara el estado actual del sistema por este
+                              resguardo. Antes de aplicarla se guardara un backup previo de
+                              seguridad.
+                            </p>
+                            <div className="backup-card__actions">
+                              <button
+                                className="secondary-button"
+                                type="button"
+                                onClick={() => setBackupRestoreTargetId("")}
+                                disabled={backupBusy}
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                className="secondary-button secondary-button--danger"
+                                type="button"
+                                onClick={handleRestoreBackup}
+                                disabled={backupBusy}
+                              >
+                                {backupBusy ? "Restaurando..." : "Confirmar restauracion"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="backup-card__actions">
+                            <button
+                              className="secondary-button secondary-button--small"
+                              type="button"
+                              onClick={() => setBackupRestoreTargetId(backup.id)}
+                              disabled={backupBusy}
+                            >
+                              Restaurar
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    ))
+                  : renderEmptyState(
+                      "Sin resguardos todavia",
+                      "Aun no hay backups guardados en Firebase para este sistema.",
+                    )}
+              </div>
+            </section>
+          </div>
+        </div>
+      ) : null}
 
       {tenantEditorOpen && tenantEditorSpace && spaceForm ? (
         <div className="modal-backdrop" onClick={closeTenantEditor}>

@@ -146,7 +146,7 @@ export interface ExpenseRecord {
 
 export interface AuditLogRecord {
   id: string;
-  entityType: "space" | "rent" | "expense";
+  entityType: "space" | "rent" | "expense" | "system";
   entityId: string;
   spaceId: string;
   actorUid: string;

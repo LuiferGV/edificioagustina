@@ -1385,6 +1385,102 @@ button:disabled {
   justify-content: flex-start;
 }
 
+.backup-admin-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.backup-admin-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid rgba(86, 192, 168, 0.18);
+  border-radius: 22px;
+  background: rgba(18, 35, 42, 0.48);
+}
+
+.backup-admin-summary h3 {
+  margin: 4px 0 8px;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.backup-admin-summary p {
+  margin: 0;
+  color: var(--ink-soft);
+  max-width: 56ch;
+}
+
+.backup-list {
+  display: grid;
+  gap: 12px;
+}
+
+.backup-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.backup-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+
+.backup-card__head h3 {
+  margin: 4px 0 6px;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.backup-card__note {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.backup-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.backup-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.backup-card__confirm {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(240, 130, 105, 0.2);
+  background: rgba(54, 24, 24, 0.4);
+}
+
+.backup-card__confirm p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.backup-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .editor-form__header h2 {
   margin: 6px 0 0;
 }
@@ -1802,6 +1898,12 @@ button:disabled {
     justify-content: flex-start;
   }
 
+  .backup-admin-summary,
+  .backup-card__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .hero__copy h1 {
     max-width: none;
   }
@@ -1868,6 +1970,7 @@ button:disabled {
   .tenant-admin-row__meta,
   .tenant-admin-row__actions,
   .mini-charge-item__meta,
+  .backup-card__actions,
   .modal-panel__actions-left,
   .modal-panel__actions-right {
     justify-content: flex-start;
