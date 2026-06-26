@@ -29,12 +29,13 @@ function createResponsible(
 }
 
 function createSpace(
-  space: Omit<BuildingSpace, "hasParking" | "parkingFee"> &
+  space: Omit<BuildingSpace, "hasParking" | "parkingFee" | "lastPaidPeriod"> &
     Partial<Pick<BuildingSpace, "hasParking" | "parkingFee">>,
 ): BuildingSpace {
   return {
     hasParking: false,
     parkingFee: 0,
+    lastPaidPeriod: "",
     ...space,
   };
 }

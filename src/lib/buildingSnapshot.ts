@@ -299,6 +299,7 @@ function normalizeSpaces(value: unknown): BuildingSpace[] {
         parkingFee: asNumber(item.parkingFee, fallback?.parkingFee ?? 0),
         dueDay: asText(item.dueDay, fallback?.dueDay ?? ""),
         nextDueDate: asText(item.nextDueDate, fallback?.nextDueDate ?? ""),
+        lastPaidPeriod: asText(item.lastPaidPeriod, fallback?.lastPaidPeriod ?? ""),
         paymentResponsible: normalizePaymentResponsible(
           item.paymentResponsible,
           fallback?.paymentResponsible,

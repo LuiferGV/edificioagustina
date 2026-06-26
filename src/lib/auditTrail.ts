@@ -49,6 +49,10 @@ export function buildSpaceAuditSummary(previous: BuildingSpace, next: BuildingSp
     changes.push("cambio vencimiento");
   }
 
+  if (previous.lastPaidPeriod !== next.lastPaidPeriod) {
+    changes.push("actualizo ultimo mes pagado");
+  }
+
   if (
     previous.paymentResponsible.displayName !== next.paymentResponsible.displayName ||
     previous.paymentResponsible.firstName !== next.paymentResponsible.firstName ||

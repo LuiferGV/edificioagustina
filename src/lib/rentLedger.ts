@@ -95,13 +95,35 @@ export function formatPeriodLabel(period: string): string {
   return `${MONTH_LABELS[month - 1]} ${year}`;
 }
 
-export function createPeriodOptions(referenceDate = new Date(), total = 8): string[] {
+export function createPeriodOptions(referenceDate = new Date(), pastMonths = 18, futureMonths = 3): string[] {
   const base = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
   const periods: string[] = [];
 
-  for (let offset = -2; offset <= total - 3; offset += 1) {
+  for (let offset = -pastMonths; offset <= futureMonths; offset += 1) {
     const point = new Date(base.getFullYear(), base.getMonth() + offset, 1);
     periods.push(toPeriod(point));
+  }
+
+  return periods;
+}
+
+export function shiftPeriod(period: string, offset: number): string {
+  const monthStart = startOfMonth(period);
+  const nextPoint = new Date(monthStart.getFullYear(), monthStart.getMonth() + offset, 1);
+  return toPeriod(nextPoint);
+}
+
+export function listPeriodsBetween(startPeriod: string, endPeriod: string): string[] {
+  if (!startPeriod || !endPeriod || startPeriod >= endPeriod) {
+    return [];
+  }
+
+  const periods: string[] = [];
+  let cursor = shiftPeriod(startPeriod, 1);
+
+  while (cursor <= endPeriod) {
+    periods.push(cursor);
+    cursor = shiftPeriod(cursor, 1);
   }
 
   return periods;

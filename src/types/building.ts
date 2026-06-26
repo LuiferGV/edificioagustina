@@ -107,6 +107,7 @@ export interface BuildingSpace {
   parkingFee: number;
   dueDay: string;
   nextDueDate: string;
+  lastPaidPeriod: string;
   paymentResponsible: PaymentResponsible;
   additionalOccupants: PersonRecord[];
   notes: string;

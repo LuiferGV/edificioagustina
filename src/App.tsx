@@ -54,6 +54,7 @@ import {
   deriveDueDateForPeriod,
   formatPeriodLabel,
   getCurrentPeriod,
+  listPeriodsBetween,
   type RentBoardRecord,
 } from "./lib/rentLedger";
 import type {
@@ -82,6 +83,7 @@ interface SpaceFormState {
   parkingFee: string;
   dueDay: string;
   nextDueDate: string;
+  lastPaidPeriod: string;
   payerDisplayName: string;
   payerFirstName: string;
   payerLastName: string;
@@ -112,6 +114,12 @@ interface ExpenseFormState {
   dueDate: string;
   paidAt: string;
   notes: string;
+}
+
+interface HistoricalDebtSummary {
+  latestPaidPeriod: string;
+  pendingPeriods: string[];
+  pendingAmount: number;
 }
 
 type MessageTone = "" | "error" | "success";
@@ -205,6 +213,7 @@ function createFormState(space: BuildingSpace): SpaceFormState {
     parkingFee: String(space.parkingFee || 0),
     dueDay: space.dueDay,
     nextDueDate: space.nextDueDate,
+    lastPaidPeriod: space.lastPaidPeriod,
     payerDisplayName: space.paymentResponsible.displayName,
     payerFirstName: space.paymentResponsible.firstName,
     payerLastName: space.paymentResponsible.lastName,
@@ -225,6 +234,21 @@ function createFormState(space: BuildingSpace): SpaceFormState {
 function buildResponsibleLabel(formState: SpaceFormState): string {
   const joinedName = `${formState.payerFirstName} ${formState.payerLastName}`.trim();
   return formState.payerDisplayName.trim() || joinedName;
+}
+
+function getSpaceFormValidationError(formState: SpaceFormState): string {
+  const responsibleLabel = buildResponsibleLabel(formState);
+  const dueDayNumber = formState.dueDay ? Number(formState.dueDay) : 0;
+
+  if ((formState.status === "alquilado" || formState.status === "accionista") && responsibleLabel.length === 0) {
+    return "Debes cargar el nombre del inquilino principal o un nombre visible.";
+  }
+
+  if (formState.dueDay && (!Number.isFinite(dueDayNumber) || dueDayNumber < 1 || dueDayNumber > 31)) {
+    return "El dia de vencimiento debe estar entre 1 y 31.";
+  }
+
+  return "";
 }
 
 function parsePositiveWholeNumber(value: string): number {
@@ -262,6 +286,7 @@ function serializeSpace(baseSpace: BuildingSpace, formState: SpaceFormState): Bu
     parkingFee,
     dueDay: formState.dueDay.trim(),
     nextDueDate: formState.nextDueDate,
+    lastPaidPeriod: formState.lastPaidPeriod,
     paymentResponsible: {
       displayName: formState.payerDisplayName.trim(),
       firstName: formState.payerFirstName.trim(),
@@ -285,6 +310,7 @@ function clearTenantAssignment(baseSpace: BuildingSpace): BuildingSpace {
     parkingFee: 0,
     dueDay: "",
     nextDueDate: "",
+    lastPaidPeriod: "",
     paymentResponsible: {
       displayName: "",
       firstName: "",
@@ -296,6 +322,51 @@ function clearTenantAssignment(baseSpace: BuildingSpace): BuildingSpace {
     },
     additionalOccupants: [],
     notes: "",
+  };
+}
+
+function sortPeriodsAscending(periods: string[]): string[] {
+  return [...periods].sort((left, right) => left.localeCompare(right));
+}
+
+function getLaterPeriod(left: string, right: string): string {
+  if (!left) {
+    return right;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  return left >= right ? left : right;
+}
+
+function buildHistoricalDebtSummary(
+  space: BuildingSpace,
+  rentLedger: RentLedgerRecord[],
+  currentPeriod: string,
+): HistoricalDebtSummary {
+  const records = sortPeriodsAscending(
+    rentLedger
+      .filter((record) => record.spaceId === space.id && record.period <= currentPeriod)
+      .map((record) => record.period),
+  );
+  const ledgerByPeriod = new Map(
+    rentLedger
+      .filter((record) => record.spaceId === space.id && record.period <= currentPeriod)
+      .map((record) => [record.period, record] as const),
+  );
+  const paidPeriods = records.filter((period) => ledgerByPeriod.get(period)?.paidAt.trim());
+  const pendingPeriods = records.filter((period) => !ledgerByPeriod.get(period)?.paidAt.trim());
+  const pendingAmount = pendingPeriods.reduce(
+    (sum, period) => sum + (ledgerByPeriod.get(period)?.chargeAmount ?? 0),
+    0,
+  );
+
+  return {
+    latestPaidPeriod: getLaterPeriod(space.lastPaidPeriod, paidPeriods.at(-1) ?? ""),
+    pendingPeriods,
+    pendingAmount,
   };
 }
 
@@ -353,6 +424,7 @@ function getSpaceSearchText(space: BuildingSpace): string {
     space.paymentResponsible.taxId,
     space.paymentResponsible.nis,
     space.paymentResponsible.meterNumber,
+    space.lastPaidPeriod,
     space.hasParking ? "estacionamiento" : "",
     String(space.parkingFee || 0),
     space.notes,
@@ -498,6 +570,25 @@ function serializePaymentForm(
     taxExpenseAmount,
     notes: formState.notes.trim(),
     createdAt: existing?.createdAt || today,
+    updatedAt: today,
+  };
+}
+
+function createPendingRentLedgerRecord(space: BuildingSpace, period: string): RentLedgerRecord {
+  const today = formatDateForStorage(new Date());
+
+  return {
+    id: createLedgerId(space.id, period),
+    spaceId: space.id,
+    period,
+    chargeAmount: space.monthlyRent,
+    dueDate: deriveDueDateForPeriod(space, period),
+    paidAt: "",
+    paymentMethod: "",
+    receivedAmount: 0,
+    taxExpenseAmount: 0,
+    notes: "",
+    createdAt: today,
     updatedAt: today,
   };
 }
@@ -753,14 +844,22 @@ export default function App() {
   const pendingExpenseRecords = expenseBoardRecords.filter((record) => record.status === "pendiente");
   const paidExpenseRecords = expenseBoardRecords.filter((record) => record.status === "pagado");
   const taxExpenseRecords = expenseBoardRecords.filter((record) => record.source === "iva");
-  const periodOptions = [...createPeriodOptions(now, 10)];
+  const currentOperationalPeriod = getCurrentPeriod(now);
+  const periodOptions = sortPeriodsAscending(
+    Array.from(
+      new Set([
+        ...createPeriodOptions(now, 36, 3),
+        selectedPeriod,
+        ...snapshot.rentLedger.map((item) => item.period),
+        ...snapshot.expenses.map((item) => item.period),
+        ...allSpaces.map((space) => space.lastPaidPeriod).filter(Boolean),
+      ]),
+    ).filter(Boolean),
+  );
+  const pastPeriodOptions = periodOptions.filter((period) => period <= currentOperationalPeriod);
   const sortedAuditLog = getSortedAuditLog(snapshot.auditLog);
   const latestAuditBySpaceId = new Map<string, AuditLogRecord>();
   const latestAuditByEntityId = new Map<string, AuditLogRecord>();
-
-  if (!periodOptions.includes(selectedPeriod)) {
-    periodOptions.unshift(selectedPeriod);
-  }
 
   for (const entry of sortedAuditLog) {
     if (!latestAuditBySpaceId.has(entry.spaceId)) {
@@ -771,6 +870,26 @@ export default function App() {
       latestAuditByEntityId.set(entry.entityId, entry);
     }
   }
+
+  const historicalDebtBySpaceId = new Map<string, HistoricalDebtSummary>(
+    allSpaces.map((space) => [
+      space.id,
+      buildHistoricalDebtSummary(space, snapshot.rentLedger, currentOperationalPeriod),
+    ]),
+  );
+  const tenantEditorDebtPreviewPeriods =
+    tenantEditorSpace && spaceForm && spaceForm.lastPaidPeriod
+      ? listPeriodsBetween(spaceForm.lastPaidPeriod, currentOperationalPeriod).filter(
+          (period) =>
+            !snapshot.rentLedger.some(
+              (record) => record.spaceId === tenantEditorSpace.id && record.period === period,
+            ),
+        )
+      : [];
+  const tenantEditorDebtPreviewAmount =
+    tenantEditorSpace && spaceForm && spaceForm.status === "alquilado"
+      ? tenantEditorDebtPreviewPeriods.length * parsePositiveWholeNumber(spaceForm.monthlyRent)
+      : 0;
 
   const tenantEditorHistory = tenantEditorSpace
     ? sortedAuditLog.filter((entry) => entry.spaceId === tenantEditorSpace.id).slice(0, 4)
@@ -1032,22 +1151,10 @@ export default function App() {
       return;
     }
 
-    const responsibleLabel = buildResponsibleLabel(spaceForm);
-    const dueDayNumber = spaceForm.dueDay ? Number(spaceForm.dueDay) : 0;
+    const validationError = getSpaceFormValidationError(spaceForm);
 
-    if (
-      (spaceForm.status === "alquilado" || spaceForm.status === "accionista") &&
-      responsibleLabel.length === 0
-    ) {
-      setTenantEditorError("Debes cargar el nombre del inquilino principal o un nombre visible.");
-      return;
-    }
-
-    if (
-      spaceForm.dueDay &&
-      (!Number.isFinite(dueDayNumber) || dueDayNumber < 1 || dueDayNumber > 31)
-    ) {
-      setTenantEditorError("El dia de vencimiento debe estar entre 1 y 31.");
+    if (validationError) {
+      setTenantEditorError(validationError);
       return;
     }
 
@@ -1074,6 +1181,117 @@ export default function App() {
       closeTenantEditor();
     } catch {
       setTenantEditorError("No se pudo guardar la ficha del inquilino.");
+    } finally {
+      setTenantEditorBusy(false);
+    }
+  }
+
+  async function handleGenerateHistoricalDebt() {
+    if (!tenantEditorSpace || !spaceForm) {
+      return;
+    }
+
+    const validationError = getSpaceFormValidationError(spaceForm);
+
+    if (validationError) {
+      setTenantEditorError(validationError);
+      return;
+    }
+
+    const nextSpace = serializeSpace(tenantEditorSpace, spaceForm);
+
+    if (nextSpace.status !== "alquilado" || nextSpace.monthlyRent <= 0) {
+      setTenantEditorError("La deuda historica solo puede generarse en espacios alquilados con monto vigente.");
+      return;
+    }
+
+    if (!nextSpace.lastPaidPeriod) {
+      setTenantEditorError("Debes indicar cual fue el ultimo mes pagado antes de generar deuda historica.");
+      return;
+    }
+
+    if (nextSpace.lastPaidPeriod >= currentOperationalPeriod) {
+      setTenantEditorError("El ultimo mes pagado debe ser anterior al mes actual para generar deuda pendiente.");
+      return;
+    }
+
+    const requestedPeriods = listPeriodsBetween(nextSpace.lastPaidPeriod, currentOperationalPeriod);
+
+    if (requestedPeriods.length === 0) {
+      setTenantEditorError("No hay meses pendientes para generar con esa referencia.");
+      return;
+    }
+
+    if (!deriveDueDateForPeriod(nextSpace, requestedPeriods[0])) {
+      setTenantEditorError("Define primero el dia de vencimiento del alquiler para generar la deuda historica.");
+      return;
+    }
+
+    const existingPeriods = new Set(
+      snapshot.rentLedger
+        .filter((record) => record.spaceId === tenantEditorSpace.id)
+        .map((record) => record.period),
+    );
+    const periodsToCreate = requestedPeriods.filter((period) => !existingPeriods.has(period));
+    const skippedCount = requestedPeriods.length - periodsToCreate.length;
+    const spaceChanged = JSON.stringify(tenantEditorSpace) !== JSON.stringify(nextSpace);
+
+    if (periodsToCreate.length === 0 && !spaceChanged) {
+      setTenantEditorError("Todos los meses de esa deuda ya existen en el sistema.");
+      return;
+    }
+
+    setTenantEditorBusy(true);
+    setTenantEditorError("");
+
+    try {
+      const updates: Record<string, BuildingSpace | RentLedgerRecord | AuditLogRecord | null> = {};
+
+      if (spaceChanged) {
+        const spaceAuditEntry = createAuditEntry({
+          actor: user,
+          entityId: tenantEditorSpace.id,
+          entityType: "space",
+          spaceId: tenantEditorSpace.id,
+          action: "Edito ficha",
+          summary: buildSpaceAuditSummary(tenantEditorSpace, nextSpace),
+        });
+
+        updates[`spaces/${tenantEditorSpace.id}`] = nextSpace;
+        updates[`auditLog/${spaceAuditEntry.id}`] = spaceAuditEntry;
+      }
+
+      for (const period of periodsToCreate) {
+        const nextRecord = createPendingRentLedgerRecord(nextSpace, period);
+        const auditEntry = createAuditEntry({
+          actor: user,
+          entityId: nextRecord.id,
+          entityType: "rent",
+          spaceId: tenantEditorSpace.id,
+          action: "Genero deuda historica",
+          summary: `genero la cobranza pendiente de ${formatPeriodLabel(period)}`,
+        });
+
+        updates[`rentLedger/${nextRecord.id}`] = nextRecord;
+        updates[`auditLog/${auditEntry.id}`] = auditEntry;
+      }
+
+      await update(ref(database), updates);
+
+      if (periodsToCreate.length > 0) {
+        setPageMessage(
+          `Se generaron ${periodsToCreate.length} meses pendientes para ${tenantEditorSpace.displayName}${
+            skippedCount > 0 ? `. ${skippedCount} ya existian.` : "."
+          }`,
+        );
+      } else {
+        setPageMessage(`Se guardo la referencia de ultimo mes pagado para ${tenantEditorSpace.displayName}.`);
+      }
+
+      setPageMessageTone("success");
+      closeTenantEditor();
+    } catch {
+      setTenantEditorError("No se pudo generar la deuda historica del inquilino.");
     } finally {
       setTenantEditorBusy(false);
     }
@@ -1680,6 +1898,11 @@ export default function App() {
               ? tenantSpaces.map((space) => {
                   const currentCharge = rentBoardRecords.find((item) => item.spaceId === space.id) ?? null;
                   const dueLabel = space.dueDay ? `Dia ${space.dueDay}` : "Sin vencimiento fijo";
+                  const debtSummary = historicalDebtBySpaceId.get(space.id) ?? {
+                    latestPaidPeriod: "",
+                    pendingPeriods: [],
+                    pendingAmount: 0,
+                  };
 
                   return (
                     <article className="tenant-admin-row" key={space.id}>
@@ -1719,6 +1942,22 @@ export default function App() {
                                 : currentCharge
                                   ? currentCharge.statusLabel
                                   : "No aplica"}
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Ult. pagado</span>
+                            <strong>
+                              {debtSummary.latestPaidPeriod
+                                ? formatPeriodLabel(debtSummary.latestPaidPeriod)
+                                : "Sin referencia"}
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Deuda</span>
+                            <strong>
+                              {debtSummary.pendingPeriods.length > 0
+                                ? `${debtSummary.pendingPeriods.length} meses / ${formatGs(debtSummary.pendingAmount)}`
+                                : "Sin deuda"}
                             </strong>
                           </div>
                           <StatusPill value={getSpaceStatusLabel(space)} />
@@ -2418,18 +2657,73 @@ export default function App() {
                   </label>
                 </div>
 
-                <label className="search-field auth-form__field">
-                  <span>Proximo vencimiento</span>
-                  <input
-                    type="date"
-                    value={spaceForm.nextDueDate}
-                    onChange={(event) =>
-                      setSpaceForm((current) =>
-                        current ? { ...current, nextDueDate: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
+                <div className="editor-grid">
+                  <label className="search-field auth-form__field">
+                    <span>Proximo vencimiento</span>
+                    <input
+                      type="date"
+                      value={spaceForm.nextDueDate}
+                      onChange={(event) =>
+                        setSpaceForm((current) =>
+                          current ? { ...current, nextDueDate: event.target.value } : current,
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="search-field auth-form__field">
+                    <span>Ultimo mes pagado</span>
+                    <AppSelect
+                      value={spaceForm.lastPaidPeriod}
+                      ariaLabel="Ultimo mes pagado"
+                      placeholder="Sin referencia cargada"
+                      options={[
+                        { value: "", label: "Sin referencia cargada" },
+                        ...pastPeriodOptions.map((period) => ({
+                          value: period,
+                          label: formatPeriodLabel(period),
+                        })),
+                      ]}
+                      onChange={(value) =>
+                        setSpaceForm((current) =>
+                          current ? { ...current, lastPaidPeriod: value } : current,
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+
+                <article className="history-debt-summary">
+                  <span>Deuda historica</span>
+                  <strong>
+                    {tenantEditorDebtPreviewPeriods.length > 0
+                      ? `${tenantEditorDebtPreviewPeriods.length} meses / ${formatGs(tenantEditorDebtPreviewAmount)}`
+                      : "Sin meses nuevos para generar"}
+                  </strong>
+                  <p>
+                    {spaceForm.lastPaidPeriod
+                      ? tenantEditorDebtPreviewPeriods.length > 0
+                        ? `Se prepararan ${tenantEditorDebtPreviewPeriods
+                            .slice(0, 3)
+                            .map((period) => formatPeriodLabel(period))
+                            .join(", ")}${
+                            tenantEditorDebtPreviewPeriods.length > 3 ? " y meses siguientes" : ""
+                          }.`
+                        : `No hay nuevos meses pendientes entre ${formatPeriodLabel(spaceForm.lastPaidPeriod)} y ${formatPeriodLabel(currentOperationalPeriod)}.`
+                      : "Carga el ultimo mes pagado para generar automaticamente los meses adeudados."}
+                  </p>
+                </article>
+
+                <div className="history-debt-actions">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={handleGenerateHistoricalDebt}
+                    disabled={tenantEditorBusy || spaceForm.status !== "alquilado"}
+                  >
+                    {tenantEditorBusy ? "Procesando..." : "Generar deuda historica"}
+                  </button>
+                </div>
               </section>
 
               <section className="editor-form__section">

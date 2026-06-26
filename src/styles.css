@@ -1354,6 +1354,37 @@ button:disabled {
   color: var(--ink-soft);
 }
 
+.history-debt-summary {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid rgba(240, 130, 105, 0.22);
+  border-radius: 20px;
+  background: rgba(52, 26, 21, 0.42);
+}
+
+.history-debt-summary span {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.history-debt-summary strong {
+  font-size: 1.12rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.history-debt-summary p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.history-debt-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .editor-form__header h2 {
   margin: 6px 0 0;
 }
