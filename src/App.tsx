@@ -28,7 +28,6 @@ import {
   getSpaceStatusLabel,
   groupSpacesByLevel,
   isNotForRent,
-  spacesToRecord,
 } from "./lib/buildingManagement";
 import {
   buildExpenseAuditSummary,
@@ -370,46 +369,6 @@ function buildHistoricalDebtSummary(
   };
 }
 
-function ledgerToRecord(ledger: RentLedgerRecord[]): Record<string, RentLedgerRecord> {
-  return ledger.reduce<Record<string, RentLedgerRecord>>((accumulator, item) => {
-    accumulator[item.id] = item;
-    return accumulator;
-  }, {});
-}
-
-function expensesToRecord(expenses: ExpenseRecord[]): Record<string, ExpenseRecord> {
-  return expenses.reduce<Record<string, ExpenseRecord>>((accumulator, item) => {
-    accumulator[item.id] = item;
-    return accumulator;
-  }, {});
-}
-
-function auditToRecord(auditLog: AuditLogRecord[]): Record<string, AuditLogRecord> {
-  return auditLog.reduce<Record<string, AuditLogRecord>>((accumulator, item) => {
-    accumulator[item.id] = item;
-    return accumulator;
-  }, {});
-}
-
-function createInitialDatabasePayload() {
-  return {
-    profile: {
-      ...demoSnapshot.profile,
-      currentPeriod: formatPeriodLabel(getCurrentPeriod(new Date())),
-    },
-    spaces: spacesToRecord(demoSnapshot.spaces),
-    rentLedger: ledgerToRecord(demoSnapshot.rentLedger),
-    expenses: expensesToRecord(demoSnapshot.expenses),
-    auditLog: auditToRecord(demoSnapshot.auditLog),
-    metrics: demoSnapshot.metrics,
-    units: demoSnapshot.units,
-    collections: demoSnapshot.collections,
-    incidents: demoSnapshot.incidents,
-    announcements: demoSnapshot.announcements,
-    agenda: demoSnapshot.agenda,
-  };
-}
-
 function getSpaceSearchText(space: BuildingSpace): string {
   return [
     space.displayName,
@@ -662,7 +621,6 @@ export default function App() {
   const [expenseEditorBusy, setExpenseEditorBusy] = useState(false);
   const [expenseEditorError, setExpenseEditorError] = useState("");
   const [expenseMetricModalKey, setExpenseMetricModalKey] = useState<ExpenseMetricCardKey | null>(null);
-  const [seedBusy, setSeedBusy] = useState(false);
   const [pageMessage, setPageMessage] = useState("");
   const [pageMessageTone, setPageMessageTone] = useState<MessageTone>("");
 
@@ -1110,37 +1068,6 @@ export default function App() {
     } catch {
       setAuthBusy(false);
       setAuthError("No se pudo cerrar la sesion actual.");
-    }
-  }
-
-  async function handleSeedDatabase() {
-    if (!user) {
-      return;
-    }
-
-    const shouldProceed =
-      typeof window === "undefined" ||
-      window.confirm(
-        "Se cargara la estructura inicial del edificio y se reemplazaran los espacios actuales. Deseas continuar?",
-      );
-
-    if (!shouldProceed) {
-      return;
-    }
-
-    setSeedBusy(true);
-    setPageMessage("");
-    setPageMessageTone("");
-
-    try {
-      await update(ref(database), createInitialDatabasePayload());
-      setPageMessage("La estructura inicial del edificio se guardo correctamente.");
-      setPageMessageTone("success");
-    } catch {
-      setPageMessage("No se pudo cargar la estructura inicial.");
-      setPageMessageTone("error");
-    } finally {
-      setSeedBusy(false);
     }
   }
 
@@ -2140,14 +2067,6 @@ export default function App() {
           </nav>
 
           <div className="dashboard-header__utility">
-            <button
-              className="secondary-button secondary-button--small"
-              type="button"
-              onClick={handleSeedDatabase}
-              disabled={seedBusy}
-            >
-              {seedBusy ? "Cargando..." : "Estructura"}
-            </button>
             <button
               className="secondary-button secondary-button--small"
               type="button"
